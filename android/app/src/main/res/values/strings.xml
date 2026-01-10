@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">glucobot</string>
+    <string name="title_activity_main">glucobot</string>
+    <string name="package_name">com.leucode.glucobot</string>
+    <string name="custom_url_scheme">com.leucode.glucobot</string>
+</resources>

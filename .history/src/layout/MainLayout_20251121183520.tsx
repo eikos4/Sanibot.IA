@@ -1,0 +1,25 @@
+export default function MainLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        flexDirection: "column",
+        width: "100%",
+        minHeight: "100dvh",
+        backgroundColor: "#FFFFFF",
+        padding: "20px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "450px", // estilo app móvil centrada
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
