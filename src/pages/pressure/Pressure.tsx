@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// @ts-ignore
+import SimulatedCall from "../../components/SimulatedCall";
 
 export default function Pressure() {
     const [systolic, setSystolic] = useState("");
     const [diastolic, setDiastolic] = useState("");
+    const [callData, setCallData] = useState<{ active: boolean; message: string; title: string } | null>(null);
+    const [userName, setUserName] = useState("Paciente");
+
+    useEffect(() => {
+        const user = JSON.parse(localStorage.getItem("glucobot_current_user") || "{}");
+        if (user.name) setUserName(user.name);
+    }, []);
 
     const save = () => {
         if (!systolic || !diastolic) return alert("Ingresa ambos valores");
@@ -18,27 +27,44 @@ export default function Pressure() {
         history.push(record);
         localStorage.setItem("pressureHistory", JSON.stringify(history));
 
-        // FEEDBACK AUTOMÁTICO
+        // FEEDBACK AUTOMÁTICO INTELIGENTE (Simulated Call)
         const s = parseInt(systolic);
         const d = parseInt(diastolic);
 
-        let msg = "Presión registrada.";
-        if (s > 140 || d > 90) msg = "¡Alerta! Tienes Hipertensión Nivel 2. Consulta a tu médico.";
-        else if (s > 130 || d > 80) msg = "¡Atención! Tienes Hipertensión Nivel 1.";
-        else if (s > 120 && d < 80) msg = "Tu presión está elevada.";
-        else msg = "Tu presión es normal y saludable. ¡Bien hecho!";
-
-        const synth = window.speechSynthesis;
-        if (synth) {
-            const u = new SpeechSynthesisUtterance(msg);
-            u.lang = "es-ES";
-            synth.cancel();
-            synth.speak(u);
-        }
-
-        alert(msg);
         setSystolic("");
         setDiastolic("");
+
+        if (s > 180 || d > 120) {
+            setCallData({
+                active: true,
+                title: "🚨 ALERTA ROJA",
+                message: `¡ALERTA ROJA ${userName}! Tu presión es crítica (${s} con ${d}). Si sientes dolor de pecho, falta de aire o mareos, llama a urgencias inmediatamente. Por favor, recuéstate y trata de calmarte mientras llega ayuda.`
+            });
+        } else if (s >= 140 || d >= 90) {
+            setCallData({
+                active: true,
+                title: "⚠️ Hipertensión Nivel 2",
+                message: `Atención ${userName}. Tu registro indica Hipertensión Nivel 2. Es importante que contactes a tu médico para ajustar tu tratamiento. Te recomiendo reducir la sal por completo el día de hoy.`
+            });
+        } else if (s >= 130 || d >= 80) {
+            setCallData({
+                active: true,
+                title: "⚠️ Hipertensión Nivel 1",
+                message: `Aviso importante ${userName}. Tu presión está un poco alta, Nivel 1. Trata de relajarte, evita el café por ahora y vuelve a medirte en una hora.`
+            });
+        } else if (s >= 120 && d < 80) {
+            setCallData({
+                active: true,
+                title: "⚠️ Presión Elevada",
+                message: `Tu presión está ligeramente elevada. Nada grave, pero vigila tu consumo de sodio y trata de descansar un poco.`
+            });
+        } else {
+            setCallData({
+                active: true,
+                title: "✅ Presión Saludable",
+                message: `¡Felicidades ${userName}! Tu presión arterial de ${s} con ${d} es perfecta. Tu corazón está trabajando muy bien. Sigue así.`
+            });
+        }
     };
 
     /* Lógica de color dinámica (Basada en AHA) */
@@ -70,6 +96,15 @@ export default function Pressure() {
 
     return (
         <div style={{ ...container, background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 100%)` }}>
+
+            {callData?.active && (
+                <SimulatedCall
+                    userName={userName}
+                    title={callData.title}
+                    message={callData.message}
+                    onEndCall={() => setCallData(null)}
+                />
+            )}
 
             <h2 style={headerTitle}>Presión Arterial</h2>
             <p style={{ color: "#555", marginBottom: "25px" }}>Registro preventivo del corazón ❤️</p>
