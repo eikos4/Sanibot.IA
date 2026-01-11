@@ -126,12 +126,10 @@ export default function MainLayout() {
     >
       {callActive && (
         <SimulatedCall
-          callerName={callerName}
+          userName={callerName}
           message={callMessage}
-          onClose={() => setCallActive(false)}
-          onConfirm={() => {
-            console.log("Medicina confirmada");
-            // Aquí podríamos guardar en localStorage el registro histórico
+          onEndCall={() => {
+            console.log("Medicina confirmada/Llamada finalizada");
             setCallActive(false);
           }}
         />
