@@ -88,8 +88,6 @@ export default function Pressure() {
         return "Normal (Saludable) ✅";
     };
 
-    // Usamos el último registro para el background color si no hay input actual
-    const lastRec = history[history.length - 1];
     // Color logic simplificada para el fondo
     const bgColor = "#F3F4F6";
 

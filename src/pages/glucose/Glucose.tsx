@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import SimulatedCall from "../../components/SimulatedCall";
 
 export default function Glucose() {
