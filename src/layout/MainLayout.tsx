@@ -153,10 +153,12 @@ export default function MainLayout() {
           <main style={{ flex: 1, paddingBottom: isMobile && !shouldHideNav ? "80px" : "0" }}>
             <Outlet />
           </main>
-          <SaniBot />
           {isMobile && !shouldHideNav && <BottomNav />}
         </div>
       )}
+
+      {/* 🤖 SANIBOT FLOTANTE (SIEMPRE VISIBLE) */}
+      <SaniBot />
 
       {/* 🔻 NAV SOLO EN MOBILE */}
       {/* The BottomNav is now rendered inside the mobile div, so this line is removed */}
