@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import SimulatedCall from "../../components/SimulatedCall";
 
 export default function Glucose() {
   const [value, setValue] = useState("");
+  const [callData, setCallData] = useState<{ active: boolean; message: string; title: string } | null>(null);
+  const [userName, setUserName] = useState("Paciente");
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("glucobot_current_user") || "{}");
+    if (user.name) setUserName(user.name);
+  }, []);
 
   const save = () => {
     if (!value) return alert("Debes ingresar un valor");
@@ -17,27 +25,29 @@ export default function Glucose() {
     history.push(record);
     localStorage.setItem("glucoseHistory", JSON.stringify(history));
 
-    // FEEDBACK AUTOMÁTICO (TTS)
-    const synth = window.speechSynthesis;
-    let msg = "Glicemia registrada correctamente.";
-
-    if (val > 180) {
-      msg = "¡Alerta! Tu nivel está alto. Te recomiendo beber agua y revisar cetonas si es posible.";
-    } else if (val < 70) {
-      msg = "¡Atención! Tienes una hipoglucemia. Por favor consume 15 gramos de azúcar de inmediato.";
-    } else {
-      msg = "Tu nivel es estable. ¡Buen trabajo manteniéndote en rango!";
-    }
-
-    if (synth) {
-      const u = new SpeechSynthesisUtterance(msg);
-      u.lang = "es-ES";
-      synth.cancel();
-      synth.speak(u);
-    }
-
-    alert(msg);
     setValue("");
+
+    // Lógica Inteligente de Alertas (Simulated Call)
+    if (val < 70) {
+      setCallData({
+        active: true,
+        title: "⚠️ ALERTA: Hipoglucemia",
+        message: `¡Alerta de hipoglucemia! ${userName}, tu nivel de ${val} es peligrosamente bajo. Por favor, consume 15 gramos de azúcar de inmediato, como un jugo de frutas o dulces. Espera 15 minutos y vuelve a medirte. Estoy aquí contigo.`
+      });
+    } else if (val > 180) {
+      setCallData({
+        active: true,
+        title: "⚠️ ALERTA: Hiperglucemia",
+        message: `¡Atención ${userName}! Tu nivel de glucosa es alto: ${val}. Te recomiendo beber mucha agua para hidratarte. Si usas insulina, verifica si necesitas una dosis de corrección según tu pauta médica. Si tienes náuseas o vómitos, busca ayuda médica.`
+      });
+    } else {
+      // Feedback positivo (opcional, puede ser solo un toast, pero hagamos llamada corta positiva)
+      setCallData({
+        active: true,
+        title: "✅ Glucosa en Rango",
+        message: `¡Excelente ${userName}! Tu nivel de ${val} está dentro del rango saludable. Buen trabajo cuidando tu salud hoy. Sigue así.`
+      });
+    }
   };
 
   /* Lógica de color dinámica */
@@ -62,6 +72,15 @@ export default function Glucose() {
 
   return (
     <div style={{ ...container, background: `linear-gradient(180deg, ${bgColor} 0%, #FFFFFF 100%)` }}>
+
+      {callData?.active && (
+        <SimulatedCall
+          userName={userName}
+          title={callData.title}
+          message={callData.message}
+          onEndCall={() => setCallData(null)}
+        />
+      )}
 
       {/* HEADER AMIGABLE */}
       <h2 style={headerTitle}>Medición de Glucosa</h2>

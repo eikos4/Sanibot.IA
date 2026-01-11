@@ -1,244 +1,182 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface SimulatedCallProps {
-    callerName?: string;
-    message: string;
-    onClose: () => void;
-    onConfirm?: () => void;
+    userName: string;
+    onEndCall: () => void;
+    message?: string;
+    title?: string;
 }
 
-export default function SimulatedCall({ callerName = "GlucoBot 🤖", message, onClose, onConfirm }: SimulatedCallProps) {
-    const [status, setStatus] = useState<"incoming" | "active" | "ended">("incoming");
-    const [duration, setDuration] = useState(0);
+export default function SimulatedCall({ userName, onEndCall, message, title }: SimulatedCallProps) {
+    const [callState, setCallState] = useState<"incoming" | "active" | "ended">("incoming");
+    const [timer, setTimer] = useState(0);
 
-    // Efecto de sonido (Ring)
-    useEffect(() => {
-        // Aquí podríamos reproducir un sonido de ringtone en loop si tuviéramos el asset
-        // Por ahora simulamos vibración si es posible
-        if (navigator.vibrate) navigator.vibrate([1000, 500, 1000, 500]);
+    // Audio context for "beep" if needed, but we'll focus on visual + TTS
+    const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-        return () => {
-            window.speechSynthesis.cancel();
-        };
-    }, []);
-
-    // Timer de duración
     useEffect(() => {
         let interval: any;
-        if (status === "active") {
+        if (callState === "active") {
             interval = setInterval(() => {
-                setDuration(prev => prev + 1);
+                setTimer((t) => t + 1);
             }, 1000);
+
+            // Iniciar TTS
+            startSpeaking();
         }
         return () => clearInterval(interval);
-    }, [status]);
+    }, [callState]);
 
-    const handleAnswer = () => {
-        setStatus("active");
-        // Hablar mensaje con instrucción clara
-        const utterance = new SpeechSynthesisUtterance(message + " Presiona el botón verde si ya tomaste tu medicamento.");
+    const startSpeaking = () => {
+        const defaultText = `¡Hola ${userName}! Soy SanniBot, tu nuevo aliado de salud. Prepárate para tomar el control total. Me encargaré de los recordatorios y los datos pesados para que tú solo te preocupes de vivir bien. Medicamentos, glucosa, alimentación... ¡lo tengo cubierto! Vamos a lograr grandes cosas juntos.`;
+
+        const text = message || defaultText;
+
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "es-ES";
-        utterance.rate = 0.9;
-        // No colgar automático inmediatamente, esperar confirmación o cuelgue manual
-        // utterance.onend = () => setTimeout(() => handleHangup(), 1000); 
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+
+        // Try to find a Spanish voice
+        const voices = window.speechSynthesis.getVoices();
+        const spanishVoice = voices.find(v => v.lang.includes("es"));
+        if (spanishVoice) utterance.voice = spanishVoice;
+
+        utterance.onend = () => {
+            setTimeout(() => {
+                handleEndCall();
+            }, 1000);
+        };
+
+        speechRef.current = utterance;
         window.speechSynthesis.speak(utterance);
     };
 
-    const handleHangup = () => {
-        setStatus("ended");
-        window.speechSynthesis.cancel();
-        setTimeout(onClose, 500);
+    const handleAcceptCall = () => {
+        setCallState("active");
     };
 
-    const handleConfirmAction = () => {
-        if (onConfirm) {
-            window.speechSynthesis.cancel();
-            const thanks = new SpeechSynthesisUtterance("¡Excelente! Toma registrada.");
-            thanks.lang = "es-ES";
-            window.speechSynthesis.speak(thanks);
-            onConfirm(); // Ejecutar acción padre
-            handleHangup();
-        }
+    const handleEndCall = () => {
+        window.speechSynthesis.cancel();
+        setCallState("ended");
+        onEndCall();
     };
 
     const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
+    if (callState === "ended") return null;
+
     return (
-        <div style={overlayStyle}>
-            <div style={backgroundBlurStyle}></div>
-
-            <div style={contentStyle}>
-                <div style={callerInfoStyle}>
-                    <div style={avatarStyle}>
-                        <img src="/robot.png" alt="Caller" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                    <h2 style={nameStyle}>{callerName}</h2>
-                    <p style={statusStyle}>
-                        {status === "incoming" ? "Llamada entrante..." :
-                            status === "active" ? formatTime(duration) : "Llamada finalizada"}
-                    </p>
+        <div style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.9)",
+            backdropFilter: "blur(10px)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "40px 20px 60px",
+            color: "white"
+        }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginTop: "40px" }}>
+                <div style={{
+                    width: "120px",
+                    height: "120px",
+                    background: "#fff",
+                    borderRadius: "50%",
+                    margin: "0 auto 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 0 30px rgba(31, 79, 255, 0.5)",
+                    animation: callState === "incoming" ? "pulse 1.5s infinite" : "none"
+                }}>
+                    <img src="/robot.png" alt="SaniBot" style={{ width: "80px" }} />
                 </div>
+                <h2 style={{ fontSize: "24px", marginBottom: "8px" }}>{title || "SaniBot.IA"}</h2>
+                <p style={{ fontSize: "16px", opacity: 0.8 }}>
+                    {callState === "incoming" ? "Llamada entrante..." : formatTime(timer)}
+                </p>
+            </div>
 
-                <div style={actionsStyle}>
-                    {status === "incoming" && (
-                        <>
-                            <button style={declineBtnStyle} onClick={handleHangup}>
-                                <span style={iconStyle}>📞</span>
-                            </button>
-                            <button style={answerBtnStyle} onClick={handleAnswer}>
-                                <span style={iconStyle}>📞</span>
-                            </button>
-                        </>
-                    )}
-
-                    {status === "active" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center" }}>
-                            {/* BOTÓN GRANDE DE CONFIRMACIÓN */}
-                            <button
-                                onClick={handleConfirmAction}
-                                style={{
-                                    background: "#4CAF50",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "16px",
-                                    padding: "20px 40px",
-                                    fontSize: "20px",
-                                    fontWeight: "bold",
-                                    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-                                    animation: "pulse-ring 2s infinite",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px"
-                                }}
-                            >
-                                ✅ SÍ, YA LO TOMÉ
-                            </button>
-
-                            <button style={{ ...declineBtnStyle, width: "60px", height: "60px", marginTop: "20px" }} onClick={handleHangup}>
-                                <span style={{ fontSize: "24px" }}>📞</span>
-                            </button>
-                        </div>
-                    )}
-
-                    {status === "ended" && (
-                        <p>Llamada finalizada</p>
-                    )}
-                </div>
+            {/* Actions */}
+            <div style={{ width: "100%", display: "flex", justifyContent: "space-around", alignItems: "center" }}>
+                {callState === "incoming" ? (
+                    <>
+                        <button onClick={handleEndCall} style={declineButtonStyle}>
+                            Colgar
+                        </button>
+                        <button onClick={handleAcceptCall} style={acceptButtonStyle}>
+                            Contestar
+                        </button>
+                    </>
+                ) : (
+                    <button onClick={handleEndCall} style={endCallButtonStyle}>
+                        <div style={{ fontSize: "24px" }}>📞</div>
+                    </button>
+                )}
             </div>
 
             <style>{`
-        @keyframes pulse-ring {
-          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-          70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(76, 175, 80, 0); }
-          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-        }
-      `}</style>
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+                    70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+                }
+            `}</style>
         </div>
     );
 }
 
-const overlayStyle: React.CSSProperties = {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0F172A",
-    color: "white",
-};
-
-const backgroundBlurStyle: React.CSSProperties = {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    backgroundImage: "url('/robot.png')", // Usamos el robot borroso de fondo
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    filter: "blur(20px) opacity(0.3)",
-    zIndex: -1,
-};
-
-const contentStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    height: "80%",
-    width: "100%",
-    alignItems: "center",
-    padding: "40px 0",
-};
-
-const callerInfoStyle: React.CSSProperties = {
-    textAlign: "center",
-    marginTop: "60px",
-};
-
-const avatarStyle: React.CSSProperties = {
-    width: "120px",
-    height: "120px",
-    borderRadius: "50%",
-    background: "white",
-    margin: "0 auto 20px",
-    padding: "10px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-};
-
-const nameStyle: React.CSSProperties = {
-    fontSize: "32px",
-    fontWeight: "bold",
-    margin: "0 0 10px",
-    textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-};
-
-const statusStyle: React.CSSProperties = {
-    fontSize: "18px",
-    opacity: 0.8,
-    margin: 0,
-};
-
-const actionsStyle: React.CSSProperties = {
-    display: "flex",
-    gap: "60px",
-    marginBottom: "40px",
-};
-
-const btnBaseStyle: React.CSSProperties = {
+const acceptButtonStyle: React.CSSProperties = {
     width: "70px",
     height: "70px",
     borderRadius: "50%",
+    background: "#22C55E",
     border: "none",
+    color: "white",
+    fontSize: "14px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "transform 0.2s",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+    justifyContent: "center"
 };
 
-const declineBtnStyle: React.CSSProperties = {
-    ...btnBaseStyle,
-    backgroundColor: "#EF4444",
-};
-
-const answerBtnStyle: React.CSSProperties = {
-    ...btnBaseStyle,
-    backgroundColor: "#10B981",
-    animation: "pulse-ring 2s infinite",
-};
-
-const iconStyle: React.CSSProperties = {
-    fontSize: "28px",
+const declineButtonStyle: React.CSSProperties = {
+    width: "70px",
+    height: "70px",
+    borderRadius: "50%",
+    background: "#EF4444",
+    border: "none",
     color: "white",
+    fontSize: "14px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    boxShadow: "0 4px 15px rgba(239, 68, 68, 0.4)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+};
+
+const endCallButtonStyle: React.CSSProperties = {
+    width: "80px",
+    height: "80px",
+    borderRadius: "50%",
+    background: "#EF4444",
+    border: "none",
+    color: "white",
+    cursor: "pointer",
+    boxShadow: "0 4px 20px rgba(239, 68, 68, 0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
 };

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import NeuralBackground from "../components/NeuralBackground";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -11,6 +12,19 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     const [role, setRole] = useState<"patient" | "caretaker">("patient");
+    const [rememberMe, setRememberMe] = useState(false);
+
+    useEffect(() => {
+        const savedCreds = localStorage.getItem("glucobot_saved_credentials");
+        if (savedCreds) {
+            const { rut, password, remember } = JSON.parse(savedCreds);
+            if (remember) {
+                setRut(rut);
+                setPassword(password);
+                setRememberMe(true);
+            }
+        }
+    }, []);
 
     const handleLogin = async () => {
         if (!rut || !password) {
@@ -45,6 +59,13 @@ export default function Login() {
             if (currentUser.role === 'admin') navigate("/admin");
             else if (currentUser.role === 'caretaker') navigate("/caretaker");
             else navigate("/home");
+
+            // Guardar o limpiar credenciales
+            if (rememberMe) {
+                localStorage.setItem("glucobot_saved_credentials", JSON.stringify({ rut, password, remember: true }));
+            } else {
+                localStorage.removeItem("glucobot_saved_credentials");
+            }
         } else {
             setError("Credenciales incorrectas");
         }
@@ -57,9 +78,14 @@ export default function Login() {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "linear-gradient(135deg, #F0F4FF 0%, #E8ECFF 100%)",
-            padding: "20px"
+            background: "#F0F4FF",
+            padding: "20px",
+            position: "relative",
+            overflow: "hidden"
         }}>
+            {/* 🔵 Shapes Animados (Background) */}
+            <NeuralBackground opacity={0.5} />
+
             <div style={{
                 background: "white",
                 padding: "40px",
@@ -67,11 +93,21 @@ export default function Login() {
                 boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
                 width: "100%",
                 maxWidth: "400px",
-                textAlign: "center"
+                textAlign: "center",
+                position: "relative",
+                zIndex: 10
             }}>
-                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🩺</div>
+                <img
+                    src="/logo.png"
+                    alt="Leucode.IA"
+                    style={{
+                        height: "80px",
+                        marginBottom: "16px",
+                        objectFit: "contain"
+                    }}
+                />
                 <h1 style={{ marginBottom: "8px", color: "#1F2937" }}>Bienvenido</h1>
-                <p style={{ color: "#6B7280", marginBottom: "32px" }}>Ingresa a tu cuenta GlucoBot</p>
+                <p style={{ color: "#6B7280", marginBottom: "32px" }}>Ingresa a tu cuenta SanniBot.IA</p>
 
                 {/* SELECTOR DE ROL */}
                 <div style={{ display: "flex", background: "#F3F4F6", padding: "4px", borderRadius: "12px", marginBottom: "20px" }}>
@@ -137,7 +173,23 @@ export default function Login() {
                             fontSize: "16px"
                         }}
                     />
-
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-start" }}>
+                        <input
+                            type="checkbox"
+                            id="rememberMe"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            style={{
+                                width: "18px",
+                                height: "18px",
+                                cursor: "pointer",
+                                accentColor: "#1F4FFF"
+                            }}
+                        />
+                        <label htmlFor="rememberMe" style={{ color: "#6B7280", fontSize: "14px", cursor: "pointer", userSelect: "none" }}>
+                            Recordar contraseña
+                        </label>
+                    </div>
                     <button
                         onClick={handleLogin}
                         disabled={loading}
@@ -178,6 +230,21 @@ export default function Login() {
 
                 {error && <p style={{ color: "red", marginTop: "20px" }}>{error}</p>}
             </div>
+
+            <div style={{
+                marginTop: "24px",
+                color: "#6B7280",
+                fontSize: "12px",
+                fontWeight: "500",
+                letterSpacing: "0.5px"
+            }}>
+                BY LEUCODE.IA ®
+            </div>
+            {/* Z-Index fix for footer */}
+            <div style={{
+                position: "relative",
+                zIndex: 10
+            }}></div>
         </div>
     );
 }

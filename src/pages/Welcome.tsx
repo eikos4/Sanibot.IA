@@ -1,90 +1,9 @@
-import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import NeuralBackground from "../components/NeuralBackground";
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current as HTMLCanvasElement | null;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Ajustar tamaño
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    // Crear nodos
-    const nodes: any[] = [];
-    const count = 30;
-
-    for (let i = 0; i < count; i++) {
-      nodes.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-      });
-    }
-
-    // Animación
-    const animate = () => {
-      // @ts-ignore
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Mover nodos
-      nodes.forEach((n) => {
-        n.x += n.vx;
-        n.y += n.vy;
-
-        // @ts-ignore
-        if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
-        // @ts-ignore
-        if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
-
-        // @ts-ignore
-        ctx.beginPath();
-        // @ts-ignore
-        ctx.arc(n.x, n.y, 3, 0, Math.PI * 2);
-        // @ts-ignore
-        ctx.fillStyle = "rgba(31,79,255,0.9)";
-        // @ts-ignore
-        ctx.fill();
-      });
-
-      // Dibujar conexiones
-      for (let i = 0; i < count; i++) {
-        for (let j = i + 1; j < count; j++) {
-          const dx = nodes[i].x - nodes[j].x;
-          const dy = nodes[i].y - nodes[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < 160) {
-            ctx.beginPath();
-            ctx.strokeStyle = `rgba(31,79,255,${1 - dist / 160})`;
-            ctx.lineWidth = 1;
-            ctx.moveTo(nodes[i].x, nodes[i].y);
-            ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.stroke();
-          }
-        }
-      }
-
-      requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    // Limpieza
-    return () => {
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
+  /* Animation logic moved to NeuralBackground */
 
   return (
     <div
@@ -101,16 +20,7 @@ export default function Welcome() {
       }}
     >
       {/* 🔵 FONDO RED NEURONAL */}
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          zIndex: 0,
-        }}
-      ></canvas>
+      <NeuralBackground />
 
       {/* CONTENIDO */}
       <div style={{ zIndex: 2 }}>
@@ -131,7 +41,7 @@ export default function Welcome() {
             color: "#1F1F1F",
           }}
         >
-          ¡Hola! Soy GlucoBot 🤖
+          ¡Hola! Soy SaniBot.IA 🤖
         </h1>
 
         <p
