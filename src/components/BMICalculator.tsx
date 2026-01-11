@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui/Card";
+import { saveWeightEntry } from "../services/weightStorage";
 
 export default function BMICalculator() {
     const [weight, setWeight] = useState("");
@@ -38,9 +39,12 @@ export default function BMICalculator() {
     };
 
     const handleSave = () => {
-        localStorage.setItem("glucobot_vitals", JSON.stringify({ w: weight, h: height }));
+        saveWeightEntry(parseFloat(weight), parseFloat(height), bmi || 0);
         calculate(weight, height);
-        if (bmi) alert(`Datos guardados. Tu IMC es ${bmi.toFixed(1)}`);
+        if (bmi) {
+            alert(`Datos guardados en historial. Tu IMC es ${bmi.toFixed(1)}`);
+            window.dispatchEvent(new Event("weight-updated"));
+        }
     };
 
     return (

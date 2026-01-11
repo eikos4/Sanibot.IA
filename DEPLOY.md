@@ -3,6 +3,18 @@
 Esta aplicación es una **Single Page Application (SPA)** construida con React y Vite.
 Para subirla a internet, no necesitas un servidor NodeJS complejo, solo necesitas un servidor web estático (Apache, Nginx, o cualquier Hosting compartido).
 
+## Paso 0: Subir a GitHub
+
+Hemos inicializado tu repositorio localmente. Para subirlo a tu cuenta, ejecuta el siguiente comando en la terminal:
+
+```bash
+git push -u origin main
+```
+
+Te pedirá tu usuario y contraseña (o Token) de GitHub.
+
+---
+
 ## Paso 1: Generar la Versión de Producción
 
 Ya hemos ejecutado este paso, pero si necesitas actualizar cambios, corre siempre:

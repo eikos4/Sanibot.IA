@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { savePatientData } from "../services/patientStorage";
 import { register } from "../services/authService";
 import type { User } from "../services/authService";
+import { validateRut, formatRut, cleanRut } from "../utils/validators";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -27,35 +28,64 @@ export default function Register() {
   });
 
   const [hasCaretaker, setHasCaretaker] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    let { name, value } = e.target;
+
+    // Formateo automático de RUT
+    if (name === "rut" || name === "emergenciaRut") {
+      value = formatRut(value);
+    }
+
+    setForm({ ...form, [name]: value });
+    // Limpiar error al escribir
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // 1. Paciente
+    if (!form.nombre.trim()) newErrors.nombre = "El nombre es obligatorio.";
+
+    if (!form.rut) newErrors.rut = "El RUT es obligatorio.";
+    else if (!validateRut(form.rut)) newErrors.rut = "RUT inválido.";
+
+    if (!form.password) newErrors.password = "La contraseña es obligatoria.";
+    else if (form.password.length < 6) newErrors.password = "Mínimo 6 caracteres.";
+
+    if (form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = "Las contraseñas no coinciden.";
+    }
+
+    // Datos opcionales importantes
+    if (form.telefono && form.telefono.length < 8) newErrors.telefono = "Formato inválido.";
+    if (!form.edad) newErrors.edad = "Requerido.";
+
+    // 2. Cuidador (Si corresponde)
+    if (form.rol === "patient" && hasCaretaker) {
+      if (!form.emergenciaNombre.trim()) newErrors.emergenciaNombre = "Nombre del cuidador requerido.";
+
+      if (!form.emergenciaRut) newErrors.emergenciaRut = "RUT del cuidador requerido.";
+      else if (!validateRut(form.emergenciaRut)) newErrors.emergenciaRut = "RUT de cuidador inválido.";
+
+      if (!form.emergenciaPassword) newErrors.emergenciaPassword = "Contraseña requerida.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async () => {
-    // 1. Validaciones Paciente
-    if (!form.rut || !form.password || !form.nombre) {
-      alert("Por favor completa tus datos obligatorios (Nombre, RUT, Contraseña)");
-      return;
-    }
-
-    if (form.password !== form.confirmPassword) {
-      alert("Tus contraseñas no coinciden");
-      return;
-    }
-
-    // 2. Validaciones Cuidador (si es paciente)
-    if (form.rol === "patient") {
-      if (!form.emergenciaNombre || !form.emergenciaRut || !form.emergenciaPassword) {
-        alert("Debes completar los datos de tu Cuidador (Nombre, RUT, Clave)");
-        return;
-      }
-    }
+    if (!validateForm()) return;
 
     // 3. Registrar Paciente
     const newPatient: User = {
       id: Date.now().toString(),
-      username: form.rut,
+      username: cleanRut(form.rut), // Guardamos RUT limpio como username
       password: form.password,
       name: form.nombre,
       // @ts-ignore
@@ -69,10 +99,10 @@ export default function Register() {
     }
 
     // 4. Registrar Cuidador (automáticamente)
-    if (form.rol === "patient") {
+    if (form.rol === "patient" && hasCaretaker) {
       const newCaretaker: User = {
         id: (Date.now() + 1).toString(),
-        username: form.emergenciaRut,
+        username: cleanRut(form.emergenciaRut),
         password: form.emergenciaPassword,
         name: form.emergenciaNombre,
         role: "caretaker"
@@ -81,23 +111,15 @@ export default function Register() {
       const caretakerRegistered = await register(newCaretaker);
       if (!caretakerRegistered) {
         alert("Advertencia: El paciente se creó, pero el RUT del cuidador ya existía. Verifica los datos.");
-        // No detenemos el flujo, pero avisamos.
       } else {
-        // Guardar datos clínicos
-        savePatientData(form); // Guarda toda la data, incluyendo info de emergencia
+        savePatientData(form);
       }
     } else {
-      // Si se está registrando un cuidador independiente (flujo legacy o alternativo)
-      // Por ahora mantenemos la opción de registrarse como cuidador directo si se desea, lo dejaremos por flexibilidad
-      // Asumimos que si elige rol "caretaker" arriba es un registro directo (quizás un cuidador profesional)
-      // Pero si es "patient", se hace el doble registro.
-      savePatientData(form); // Si es cuidador, guarda sus propios datos (aunque no sean de paciente)
+      savePatientData(form);
     }
 
-    alert("¡Cuenta creada! Tu cuidador también ha sido registrado exitosamente.");
-    navigate("/login");
+    navigate("/register-complete");
   };
-
 
   return (
     <div
@@ -113,14 +135,7 @@ export default function Register() {
         Crear Cuenta
       </h2>
 
-      <p
-        style={{
-          color: "#666",
-          textAlign: "center",
-          marginBottom: "25px",
-          fontSize: "15px",
-        }}
-      >
+      <p style={{ color: "#666", textAlign: "center", marginBottom: "25px", fontSize: "15px" }}>
         Completa tu información y asigna a tu cuidador.
       </p>
 
@@ -131,15 +146,29 @@ export default function Register() {
         <p style={{ fontSize: "14px", color: "#666", marginBottom: "5px" }}>Te estás registrando como:</p>
         <select style={input} name="rol" onChange={handleChange} value={form.rol}>
           <option value="patient">Paciente (con Cuidador)</option>
-          {/* Opcional: Permitir registro solo cuidador si se desea, lo dejaremos por flexibilidad */}
           <option value="caretaker">Cuidador (Independiente)</option>
         </select>
       </div>
 
-      <input style={input} name="rut" placeholder="Tu RUT" onChange={handleChange} />
-      <input style={input} type="password" name="password" placeholder="Tu Contraseña" onChange={handleChange} />
-      <input style={input} type="password" name="confirmPassword" placeholder="Confirmar Tu Contraseña" onChange={handleChange} />
-      <input style={input} name="nombre" placeholder="Tu Nombre completo" onChange={handleChange} />
+      <div style={{ marginBottom: "10px" }}>
+        <input style={input} name="rut" placeholder="Tu RUT" onChange={handleChange} value={form.rut} maxLength={12} />
+        {errors.rut && <span style={errorText}>{errors.rut}</span>}
+      </div>
+
+      <div style={{ marginBottom: "10px" }}>
+        <input style={input} type="password" name="password" placeholder="Tu Contraseña" onChange={handleChange} />
+        {errors.password && <span style={errorText}>{errors.password}</span>}
+      </div>
+
+      <div style={{ marginBottom: "10px" }}>
+        <input style={input} type="password" name="confirmPassword" placeholder="Confirmar Tu Contraseña" onChange={handleChange} />
+        {errors.confirmPassword && <span style={errorText}>{errors.confirmPassword}</span>}
+      </div>
+
+      <div style={{ marginBottom: "10px" }}>
+        <input style={input} name="nombre" placeholder="Tu Nombre completo" onChange={handleChange} />
+        {errors.nombre && <span style={errorText}>{errors.nombre}</span>}
+      </div>
 
 
       {form.rol === "patient" && (
@@ -147,7 +176,11 @@ export default function Register() {
           {/* DATOS PERSONALES */}
           <h3 style={sectionTitle}>📋 Tus Datos Personales</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <input style={{ ...input, marginTop: "0" }} name="edad" placeholder="Edad" type="number" onChange={handleChange} />
+            <div>
+              <input style={{ ...input, marginTop: "0" }} name="edad" placeholder="Edad" type="number" onChange={handleChange} />
+              {errors.edad && <span style={errorText}>{errors.edad}</span>}
+            </div>
+
             <select style={{ ...input, marginTop: "0" }} name="estadoCivil" onChange={handleChange}>
               <option value="">Estado civil</option>
               <option value="Soltero(a)">Soltero(a)</option>
@@ -157,7 +190,11 @@ export default function Register() {
             </select>
           </div>
           <input style={input} name="direccion" placeholder="Dirección" onChange={handleChange} />
-          <input style={input} name="telefono" placeholder="Teléfono" onChange={handleChange} />
+
+          <div style={{ marginBottom: "10px" }}>
+            <input style={input} name="telefono" placeholder="Teléfono" onChange={handleChange} />
+            {errors.telefono && <span style={errorText}>{errors.telefono}</span>}
+          </div>
 
           {/* DATOS CLÍNICOS */}
           <h3 style={sectionTitle}>🩸 Datos Clínicos</h3>
@@ -200,41 +237,27 @@ export default function Register() {
                 Crearemos una cuenta para él/ella automáticamente.
               </p>
 
-              <input
-                style={input}
-                name="emergenciaNombre"
-                placeholder="Nombre del Cuidador"
-                onChange={handleChange}
-              />
-              <input
-                style={input}
-                name="emergenciaRelacion"
-                placeholder="Relación (Ej: Hijo, Enfermera)"
-                onChange={handleChange}
-              />
-              <input
-                style={input}
-                name="emergenciaTelefono"
-                placeholder="Teléfono del Cuidador"
-                onChange={handleChange}
-              />
+              <div style={{ marginBottom: "10px" }}>
+                <input style={input} name="emergenciaNombre" placeholder="Nombre Del Cuidador" onChange={handleChange} />
+                {errors.emergenciaNombre && <span style={errorText}>{errors.emergenciaNombre}</span>}
+              </div>
+
+              <input style={input} name="emergenciaRelacion" placeholder="Relación (Ej: Hijo, Enfermera)" onChange={handleChange} />
+              <input style={input} name="emergenciaTelefono" placeholder="Teléfono del Cuidador" onChange={handleChange} />
 
               <div style={{ height: "1px", background: "#D3DAEB", margin: "15px 0" }}></div>
 
               <p style={{ fontSize: "13px", fontWeight: "bold", color: "#1F4FFF", marginBottom: "5px" }}>Credenciales para el Cuidador:</p>
-              <input
-                style={input}
-                name="emergenciaRut"
-                placeholder="RUT del Cuidador (Usuario)"
-                onChange={handleChange}
-              />
-              <input
-                style={input}
-                type="password"
-                name="emergenciaPassword"
-                placeholder="Crear Contraseña para Cuidador"
-                onChange={handleChange}
-              />
+
+              <div style={{ marginBottom: "10px" }}>
+                <input style={input} name="emergenciaRut" placeholder="RUT del Cuidador (Usuario)" onChange={handleChange} value={form.emergenciaRut} maxLength={12} />
+                {errors.emergenciaRut && <span style={errorText}>{errors.emergenciaRut}</span>}
+              </div>
+
+              <div style={{ marginBottom: "10px" }}>
+                <input style={input} type="password" name="emergenciaPassword" placeholder="Crear Contraseña para Cuidador" onChange={handleChange} />
+                {errors.emergenciaPassword && <span style={errorText}>{errors.emergenciaPassword}</span>}
+              </div>
             </div>
           )}
         </>
@@ -256,7 +279,7 @@ export default function Register() {
   );
 }
 
-const input = {
+const input: React.CSSProperties = {
   width: "100%",
   padding: "13px",
   borderRadius: "10px",
@@ -265,8 +288,8 @@ const input = {
   fontSize: "16px",
 };
 
-const sectionTitle = {
-  textAlign: "left" as const,
+const sectionTitle: React.CSSProperties = {
+  textAlign: "left",
   marginTop: "20px",
   marginBottom: "8px",
   color: "#333",
@@ -274,7 +297,7 @@ const sectionTitle = {
   fontWeight: 600,
 };
 
-const btn = {
+const btn: React.CSSProperties = {
   width: "100%",
   padding: "17px",
   borderRadius: "12px",
@@ -284,4 +307,12 @@ const btn = {
   marginTop: "30px",
   fontSize: "18px",
   cursor: "pointer",
+};
+
+const errorText: React.CSSProperties = {
+  color: "#EF4444",
+  fontSize: "12px",
+  marginLeft: "5px",
+  marginTop: "2px",
+  display: "block"
 };

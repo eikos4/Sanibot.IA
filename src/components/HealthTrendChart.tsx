@@ -5,7 +5,7 @@ import { Card } from "./ui/Card";
 interface HealthTrendChartProps {
     title: string;
     data: any[]; // Raw data from storage
-    type: 'glucose' | 'pressure';
+    type: 'glucose' | 'pressure' | 'weight';
     color?: string;
 }
 
@@ -25,14 +25,17 @@ export default function HealthTrendChart({ title, data, type, color = "#10B981" 
     const padding = 15;
 
     // Procesar datos (últimos 7)
+    // Para weight, si no hay 'date', usamos orden de llegada
     const recentData = data.slice(-7);
 
     // Calcular rangos Y dinámicos
     let allValues: number[] = [];
     if (type === 'glucose') {
         allValues = recentData.map(d => Number(d.valor));
-    } else {
+    } else if (type === 'pressure') {
         allValues = recentData.flatMap(d => [Number(d.sistolica), Number(d.diastolica)]);
+    } else if (type === 'weight') {
+        allValues = recentData.map(d => Number(d.weight));
     }
 
     const minVal = Math.min(...allValues) * 0.9;
@@ -47,12 +50,17 @@ export default function HealthTrendChart({ title, data, type, color = "#10B981" 
     };
 
     // Generar paths
-    let path1 = ""; // Glucosa o Sistólica
+    let path1 = ""; // Glucosa o Sistólica o Peso
     let path2 = ""; // Diastólica
 
     if (type === 'glucose') {
         path1 = recentData.map((d, i) => {
             const { x, y } = getCoord(Number(d.valor), i);
+            return `${x},${y}`;
+        }).join(" ");
+    } else if (type === 'weight') {
+        path1 = recentData.map((d, i) => {
+            const { x, y } = getCoord(Number(d.weight), i);
             return `${x},${y}`;
         }).join(" ");
     } else {
@@ -69,13 +77,23 @@ export default function HealthTrendChart({ title, data, type, color = "#10B981" 
 
     // Ultimo valor para destacar
     const lastItem = recentData[recentData.length - 1];
-    const displayValue = type === 'glucose'
-        ? `${lastItem.valor} mg/dL`
-        : `${lastItem.sistolica}/${lastItem.diastolica}`;
 
-    const isAlert = type === 'glucose'
-        ? (Number(lastItem.valor) > 180 || Number(lastItem.valor) < 70)
-        : (Number(lastItem.sistolica) > 140 || Number(lastItem.diastolica) > 90);
+    let displayValue = "";
+    let isAlert = false;
+
+    if (type === 'glucose') {
+        displayValue = `${lastItem.valor} mg/dL`;
+        isAlert = (Number(lastItem.valor) > 180 || Number(lastItem.valor) < 70);
+    } else if (type === 'pressure') {
+        displayValue = `${lastItem.sistolica}/${lastItem.diastolica}`;
+        isAlert = (Number(lastItem.sistolica) > 140 || Number(lastItem.diastolica) > 90);
+    } else if (type === 'weight') {
+        displayValue = `${lastItem.weight} kg`;
+        // Alerta simple si BMI > 30 o < 18.5 (si tuvieramos BMI aqui). 
+        // Como solo pasamos weight, no alertamos o usamos logica simple.
+        // Asumamos que no hay alerta roja por ahora en el grafico mini.
+        isAlert = false;
+    }
 
     const mainColor = isAlert ? "#EF4444" : color;
 
@@ -127,7 +145,11 @@ export default function HealthTrendChart({ title, data, type, color = "#10B981" 
                 {/* Dots Logic - Solo puntos finales para limpieza visual */}
                 {recentData.map((d, i) => {
                     // Solo dibujar glucosa o sistólica dots
-                    const val = type === 'glucose' ? Number(d.valor) : Number(d.sistolica);
+                    let val = 0;
+                    if (type === 'glucose') val = Number(d.valor);
+                    else if (type === 'weight') val = Number(d.weight);
+                    else val = Number(d.sistolica);
+
                     const { x, y } = getCoord(val, i);
                     return <circle key={'p1' + i} cx={x} cy={y} r="3" fill="white" stroke={mainColor} strokeWidth="2" />
                 })}

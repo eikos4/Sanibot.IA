@@ -1,6 +1,23 @@
+import { useState, useEffect } from "react";
 import BMICalculator from "../components/BMICalculator";
+import HealthTrendChart from "../components/HealthTrendChart";
+import { getWeightHistory, type WeightEntry } from "../services/weightStorage";
 
 export default function WeightControl() {
+    const [history, setHistory] = useState<WeightEntry[]>([]);
+
+    const loadHistory = () => {
+        setHistory(getWeightHistory());
+    };
+
+    useEffect(() => {
+        loadHistory();
+
+        const handleUpdate = () => loadHistory();
+        window.addEventListener("weight-updated", handleUpdate);
+        return () => window.removeEventListener("weight-updated", handleUpdate);
+    }, []);
+
     return (
         <div style={{ padding: "20px", paddingBottom: "100px", maxWidth: "800px", margin: "0 auto" }}>
             <header style={{ marginBottom: "30px", textAlign: "center" }}>
@@ -9,6 +26,16 @@ export default function WeightControl() {
                     Monitorea tu peso para mantener tu diabetes bajo control.
                 </p>
             </header>
+
+            {/* Gráfico de Evolución */}
+            <div style={{ marginBottom: "20px" }}>
+                <HealthTrendChart
+                    title="Evolución de Peso"
+                    data={history}
+                    type="weight"
+                    color="#8B5CF6" // Violeta
+                />
+            </div>
 
             {/* Reutilizamos el componente de calculadora */}
             <BMICalculator />

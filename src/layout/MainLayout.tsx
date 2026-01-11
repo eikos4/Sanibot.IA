@@ -75,7 +75,24 @@ export default function MainLayout() {
         });
       } catch (e) { console.error("Error checking diet", e); }
 
-      // 3. CHECK HIDRATACIÓN (Regla Inteligente)
+      // 3. CHECK INSULINA
+      try {
+        const insulinPlan = JSON.parse(localStorage.getItem("glucobot_insulin_plan") || "[]");
+        insulinPlan.forEach((dose: any) => {
+          if (!dose.enabled) return;
+
+          const alertKey = `insulin_alert_${todayStr}_${dose.id}`;
+
+          if (isTimeMatch(dose.time) && !localStorage.getItem(alertKey)) {
+            setCallMessage(`Atención. Es hora de tu insulina: ${dose.description}. Debes administrarte ${dose.units} unidades.`);
+            setCallerName("SaniBot - Insulina");
+            setCallActive(true);
+            localStorage.setItem(alertKey, "true");
+          }
+        });
+      } catch (e) { console.error("Error checking insulin", e); }
+
+      // 4. CHECK HIDRATACIÓN (Regla Inteligente)
       if (parseInt(currentHour) >= 18 && parseInt(currentHour) <= 20) {
         // Entre las 18 y las 20, si ha tomado menos de 4 vasos
         const hydrationKey = `hydration_${todayStr}`;

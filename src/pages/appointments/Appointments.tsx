@@ -24,9 +24,30 @@ export default function Appointments() {
 
   return (
     <div style={{ textAlign: "center", paddingBottom: "100px", padding: "20px" }}>
-      <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1F1F1F", marginBottom: "20px" }}>
-        📅 Agenda Médica
-      </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1F1F1F", margin: 0 }}>
+          📅 Agenda
+        </h2>
+        <button
+          onClick={() => navigate("/appointments/add")}
+          style={{
+            background: "#1F4FFF",
+            color: "white",
+            border: "none",
+            borderRadius: "12px",
+            padding: "10px 16px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            boxShadow: "0 4px 10px rgba(31, 79, 255, 0.2)"
+          }}
+        >
+          ➕ Nueva
+        </button>
+      </div>
 
       {list.length === 0 ? (
         <div style={{ marginTop: "60px", color: "#666", animation: "fadeInUp 0.5s ease" }}>
@@ -67,14 +88,6 @@ export default function Appointments() {
           })}
         </div>
       )}
-
-      {/* FAB (Floating Action Button) */}
-      <button
-        style={fab}
-        onClick={() => navigate("/appointments/add")}
-      >
-        ➕
-      </button>
     </div>
   );
 }
@@ -112,26 +125,6 @@ const deleteBtn: React.CSSProperties = {
   justifyContent: "center",
   marginLeft: "10px",
   transition: "background 0.2s"
-};
-
-const fab: React.CSSProperties = {
-  position: "fixed",
-  bottom: "90px", // Encima del BottomNav
-  right: "20px",
-  width: "60px",
-  height: "60px",
-  borderRadius: "50%",
-  background: "#1F4FFF",
-  color: "white",
-  border: "none",
-  fontSize: "24px",
-  fontWeight: "bold",
-  cursor: "pointer",
-  boxShadow: "0 4px 15px rgba(31, 79, 255, 0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 100
 };
 
 // Agregar estilos globales de animación si no existen

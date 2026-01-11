@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
       manifest: {
-        name: "GlucoBot",
-        short_name: "GlucoBot",
+        name: "Sanibot.IA",
+        short_name: "Sanibot.IA",
         description: "Acompañamiento inteligente para pacientes diabéticos",
         theme_color: "#1F4FFF",
         background_color: "#FFFFFF",

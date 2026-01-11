@@ -129,6 +129,7 @@ function HomeDesktop({ greeting, patient, navigate }: HomeProps) {
 
           {bigCard("💊", "Gestión de Medicamentos", "/medicines", "#EEF2FF", "#6366F1", navigate)}
           {bigCard("🩸", "Registro de Glicemia", "/glucose", "#FEF2F2", "#EF4444", navigate)}
+          {bigCard("💉", "Control de Insulina", "/insulin", "#EEE", "#4F46E5", navigate)}
           {bigCard("❤️", "Presión Arterial", "/pressure", "#FFF1F2", "#BE123C", navigate)}
           {bigCard("⚖️", "Control de Peso", "/weight", "#F3E8FF", "#7C3AED", navigate)}
           {bigCard("🍽", "Control de Alimentación", "/food", "#F0FDF4", "#10B981", navigate)}
@@ -512,6 +513,7 @@ function HomeMobile({ greeting, patient, navigate }: HomeProps) {
         </div>
         {mobileCard("💊", "Medicamentos", "/medicines", "#EEF2FF", navigate)}
         {mobileCard("🩸", "Glicemia", "/glucose", "#FEF2F2", navigate)}
+        {mobileCard("💉", "Control de Insulina", "/insulin", "#EEE", navigate)}
         {mobileCard("❤️", "Presión Arterial", "/pressure", "#FFF1F2", navigate)}
         {mobileCard("⚖️", "Control de Peso", "/weight", "#F3E8FF", navigate)}
         {mobileCard("🍽", "Alimentación", "/food", "#F0FDF4", navigate)}
