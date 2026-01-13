@@ -28,7 +28,11 @@ export default function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setPatient(getPatientData());
+    const fetchData = async () => {
+      const data = await getPatientData();
+      setPatient(data as any);
+    };
+    fetchData();
 
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("¡Buenos días!");

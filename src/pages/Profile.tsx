@@ -18,10 +18,14 @@ export default function Profile() {
   const [patient, setPatient] = useState<PatientData | null>(null);
 
   useEffect(() => {
-    const data = getPatientData();
-    if (data) {
-      setPatient(data);
-    }
+    const fetchProfile = async () => {
+      // @ts-ignore
+      const data = await getPatientData();
+      if (data) {
+        setPatient(data as PatientData);
+      }
+    };
+    fetchProfile();
   }, []);
 
   if (!patient) {
