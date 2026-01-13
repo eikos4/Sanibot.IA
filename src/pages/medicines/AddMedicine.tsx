@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { addMedicine } from "../../services/medicineStorage";
 import type { Medicine } from "../../services/medicineStorage";
+import { NotificationService } from "../../services/notificationService";
 
 export default function AddMedicine() {
   const navigate = useNavigate();
@@ -52,6 +53,17 @@ export default function AddMedicine() {
 
     try {
       await addMedicine(newMed);
+      // Schedule local notification
+      try {
+        await NotificationService.scheduleMedicineReminder({
+          id: form.nombre, // Using name as ID part for simplicity or generate a proper one if Medicine has it
+          nombre: form.nombre,
+          horario: horarios.join(',')
+        });
+      } catch (noteError) {
+        console.error("Error scheduling notification", noteError);
+      }
+
       navigate("/medicines");
     } catch (error) {
       console.error("Error adding medicine:", error);
