@@ -15,18 +15,18 @@ export default function InsulinControl() {
         loadPlan();
     }, []);
 
-    const loadPlan = () => {
-        setPlan(getInsulinPlan());
+    const loadPlan = async () => {
+        const data = await getInsulinPlan();
+        setPlan(data);
     };
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (!description || !units || !time) {
             alert("Completa todos los campos");
             return;
         }
 
-        const newDose: InsulinDose = {
-            id: Date.now().toString(),
+        const newDose: Omit<InsulinDose, "id"> = {
             description,
             units,
             time,
@@ -34,8 +34,8 @@ export default function InsulinControl() {
             enabled: true
         };
 
-        addInsulinDose(newDose);
-        loadPlan();
+        await addInsulinDose(newDose);
+        await loadPlan();
 
         // Reset form
         setDescription("");
@@ -43,16 +43,20 @@ export default function InsulinControl() {
         setTime("");
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("¿Borrar este esquema?")) {
-            deleteInsulinDose(id);
+            await deleteInsulinDose(id);
             loadPlan();
         }
     };
 
-    const handleToggle = (id: string) => {
-        toggleInsulinDose(id);
-        loadPlan();
+    const handleToggle = async (id: string) => {
+        // Find existing to know status
+        const current = plan.find(d => d.id === id);
+        if (current) {
+            await toggleInsulinDose(id, current.enabled);
+            loadPlan();
+        }
     };
 
     return (

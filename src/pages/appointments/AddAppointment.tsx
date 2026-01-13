@@ -15,12 +15,12 @@ export default function AddAppointment() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.doctor || !form.fecha) {
       alert("Por favor completa el doctor y la fecha");
       return;
     }
-    saveAppointment(form);
+    await saveAppointment(form);
     alert("Cita agendada correctamente");
     navigate("/appointments");
   };

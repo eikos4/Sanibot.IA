@@ -7,17 +7,18 @@ export default function Appointments() {
   const navigate = useNavigate();
   const [list, setList] = useState<Appointment[]>([]);
 
-  const load = () => {
-    setList(getAppointments());
+  const load = async () => {
+    const data = await getAppointments();
+    setList(data);
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("¿Eliminar esta cita?")) {
-      deleteAppointment(id);
+      await deleteAppointment(id);
       load();
     }
   };

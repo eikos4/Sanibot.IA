@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import SimulatedCall from "../../components/SimulatedCall";
 
+// @ts-ignore
+import { saveGlucose, getGlucoseHistory } from "../../services/glucoseStorage";
+
 export default function Glucose() {
   const [value, setValue] = useState("");
   const [callData, setCallData] = useState<{ active: boolean; message: string; title: string } | null>(null);
@@ -8,30 +11,33 @@ export default function Glucose() {
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
+    // We can get user from context if we want, but for now we keep this sim
     const user = JSON.parse(localStorage.getItem("glucobot_current_user") || "{}");
     if (user.name) setUserName(user.name);
     loadHistory();
   }, []);
 
-  const loadHistory = () => {
-    const data = JSON.parse(localStorage.getItem("glucoseHistory") || "[]");
+  const loadHistory = async () => {
+    const data = await getGlucoseHistory();
     setHistory(data);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!value) return alert("Debes ingresar un valor");
 
     const val = parseInt(value);
     const record = {
       fecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
       valor: val,
-      timestamp: Date.now()
+      hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      comida: "Registrado desde Panel", // Default for now
     };
 
-    // Guardar en localStorage
-    const newHistory = [...history, record];
-    localStorage.setItem("glucoseHistory", JSON.stringify(newHistory));
-    setHistory(newHistory);
+    // Save to Firestore
+    await saveGlucose(record);
+
+    // Refresh history
+    await loadHistory();
     setValue("");
 
     // Lógica Inteligente de Alertas (Simulated Call)

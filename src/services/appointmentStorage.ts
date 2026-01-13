@@ -1,3 +1,15 @@
+import {
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    query,
+    orderBy,
+    where
+} from "firebase/firestore";
+import { auth, db } from "../firebase/config";
+
 export interface Appointment {
     id: string;
     doctor: string;
@@ -6,52 +18,73 @@ export interface Appointment {
     motivo: string;
 }
 
-const STORAGE_KEY = "glucobot_appointments";
+const getCollection = () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    return collection(db, "users", user.uid, "appointments");
+};
 
-export const getAppointments = (): Appointment[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
+export const getAppointments = async (): Promise<Appointment[]> => {
     try {
-        const list: Appointment[] = JSON.parse(data);
+        const user = auth.currentUser;
+        if (!user) return [];
+
+        const col = getCollection();
         // Ordenar por fecha y hora ascendente
-        return list.sort((a, b) => {
-            const dateA = new Date(`${a.fecha}T${a.hora || "00:00"}`);
-            const dateB = new Date(`${b.fecha}T${b.hora || "00:00"}`);
-            return dateA.getTime() - dateB.getTime();
-        });
+        const q = query(col, orderBy("fecha", "asc"), orderBy("hora", "asc"));
+
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as Appointment));
     } catch (e) {
-        console.error("Error parsing appointments", e);
+        console.error("Error fetching appointments", e);
         return [];
     }
 };
 
-export const saveAppointment = (appointment: Omit<Appointment, "id">) => {
-    const list = getAppointments();
-    const newApp: Appointment = {
-        ...appointment,
-        id: Date.now().toString(),
-    };
-    list.push(newApp);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+export const saveAppointment = async (appointment: Omit<Appointment, "id">) => {
+    try {
+        const col = getCollection();
+        await addDoc(col, appointment);
+    } catch (e) {
+        console.error("Error saving appointment", e);
+        throw e;
+    }
 };
 
-export const deleteAppointment = (id: string) => {
-    const list = getAppointments().filter((a) => a.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+export const deleteAppointment = async (id: string) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const docRef = doc(db, "users", user.uid, "appointments", id);
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.error("Error deleting appointment", e);
+        throw e;
+    }
 };
 
-export const getNextAppointment = (): Appointment | null => {
-    const list = getAppointments();
-    const now = new Date();
+export const getNextAppointment = async (): Promise<Appointment | null> => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return null;
 
-    // Buscar la primera cita que sea futura (o hoy pero más tarde)
-    // Simplificación: tomamos la primera de la lista ordenada que sea >= hoy
-    // Como ya están ordenadas, basta encontrar la primera cuya fecha no haya pasado.
+        const col = getCollection();
+        // Since Firestore is server-side, ">= today" is tricky if we store just strings YYYY-MM-DD
+        // A simple query is to get all and filter in JS, OR use ISO strings for query
+        // For simplicity and small datasets, we fetch future ones by date
+        const today = new Date().toISOString().split('T')[0];
+        const q = query(col, where("fecha", ">=", today), orderBy("fecha", "asc"), orderBy("hora", "asc"));
 
-    const future = list.find(a => {
-        const date = new Date(`${a.fecha}T${a.hora || "23:59"}`);
-        return date >= now;
-    });
-
-    return future || null;
+        const snapshot = await getDocs(q);
+        // JS Filter for exact time if needed, but date >= is usually enough for "upcoming" logic display
+        if (!snapshot.empty) {
+            return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Appointment;
+        }
+    } catch (e) {
+        console.error("Error fetching next appointment", e);
+    }
+    return null;
 };

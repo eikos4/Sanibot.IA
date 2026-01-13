@@ -19,18 +19,31 @@ interface HomeProps {
   greeting: string;
   patient: User | null;
   navigate: (path: string) => void;
+  // New props for async data
+  lastGlucose?: any;
+  glucoseHistory?: any[];
 }
 
 export default function Home() {
   const [patient, setPatient] = useState(null);
   const [greeting, setGreeting] = useState("¡Hola!");
   const [isDesktop, setIsDesktop] = useState(false);
+  // States for async data
+  const [lastGlucose, setLastGlucose] = useState<any>(null);
+  const [glucoseHistory, setGlucoseHistory] = useState<any[]>([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
       const data = await getPatientData();
       setPatient(data as any);
+
+      const lastG = await getLastGlucose();
+      setLastGlucose(lastG);
+
+      const history = await getGlucoseHistory();
+      setGlucoseHistory(history);
     };
     fetchData();
 
@@ -48,14 +61,26 @@ export default function Home() {
   }, []);
 
   return isDesktop ? (
-    <HomeDesktop greeting={greeting} patient={patient} navigate={navigate} />
+    <HomeDesktop
+      greeting={greeting}
+      patient={patient}
+      navigate={navigate}
+      lastGlucose={lastGlucose}
+      glucoseHistory={glucoseHistory}
+    />
   ) : (
-    <HomeMobile greeting={greeting} patient={patient} navigate={navigate} />
+    <HomeMobile
+      greeting={greeting}
+      patient={patient}
+      navigate={navigate}
+      lastGlucose={lastGlucose}
+      glucoseHistory={glucoseHistory}
+    />
   );
 }
 
 /* --------------------------  MODO DESKTOP  -------------------------- */
-function HomeDesktop({ greeting, patient, navigate }: HomeProps) {
+function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory }: HomeProps) {
   return (
     <div className="desktop-container">
       {/* SIDEBAR */}
@@ -91,8 +116,8 @@ function HomeDesktop({ greeting, patient, navigate }: HomeProps) {
           <div style={{ display: "flex", gap: "20px", marginTop: "30px", marginBottom: "10px" }}>
             <div style={{ flex: 1, background: "#fff", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
               <div style={{ fontSize: "12px", color: "#666" }}>Última Glicemia</div>
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: getLastGlucose()?.valor > 180 ? "#EF4444" : "#10B981" }}>
-                {getLastGlucose()?.valor ? `${getLastGlucose().valor} mg/dL` : "Sin datos"}
+              <div style={{ fontSize: "18px", fontWeight: "bold", color: (lastGlucose?.valor || 0) > 180 ? "#EF4444" : "#10B981" }}>
+                {lastGlucose ? `${lastGlucose.valor} mg/dL` : "Sin datos"}
               </div>
             </div>
             {/* WIDGET PRÓXIMA CITA */}
@@ -118,7 +143,7 @@ function HomeDesktop({ greeting, patient, navigate }: HomeProps) {
           <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
             <HealthTrendChart
               title="Tendencia Glucosa"
-              data={getGlucoseHistory()}
+              data={glucoseHistory || []}
               type="glucose"
             />
             <HealthTrendChart
@@ -444,7 +469,7 @@ function bigCard(icon: string, title: string, path: string, bgColor: string, acc
 }
 
 /* --------------------------  MODO MOBILE  -------------------------- */
-function HomeMobile({ greeting, patient, navigate }: HomeProps) {
+function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory }: HomeProps) {
   return (
     <div className="mobile-container">
       {/* Hero Section */}
@@ -462,8 +487,8 @@ function HomeMobile({ greeting, patient, navigate }: HomeProps) {
           <div style={{ display: "flex", gap: "10px" }}>
             <div style={{ flex: 1, background: "#fff", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
               <div style={{ fontSize: "12px", color: "#666" }}>Última Glicemia</div>
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: getLastGlucose()?.valor > 180 ? "#EF4444" : "#10B981" }}>
-                {getLastGlucose()?.valor ? `${getLastGlucose().valor} mg/dL` : "Sin datos"}
+              <div style={{ fontSize: "18px", fontWeight: "bold", color: (lastGlucose?.valor || 0) > 180 ? "#EF4444" : "#10B981" }}>
+                {lastGlucose ? `${lastGlucose.valor} mg/dL` : "Sin datos"}
               </div>
             </div>
           </div>
@@ -500,7 +525,7 @@ function HomeMobile({ greeting, patient, navigate }: HomeProps) {
         <div style={{ gridColumn: "1 / -1", display: "grid", gap: "15px" }}>
           <HealthTrendChart
             title="Tendencia Glucosa"
-            data={getGlucoseHistory()}
+            data={glucoseHistory || []}
             type="glucose"
             color="#10B981"
           />
