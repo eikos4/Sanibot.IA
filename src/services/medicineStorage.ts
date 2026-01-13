@@ -7,7 +7,8 @@ import {
   doc,
   onSnapshot,
   query,
-  where
+  where,
+  getDocs
 } from "firebase/firestore";
 
 export interface Medicine {
@@ -73,7 +74,7 @@ export const getMedicines = async (): Promise<Medicine[]> => {
 
   const q = query(collection(db, COLLECTION), where("userId", "==", user.uid));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
+  return snapshot.docs.map((doc: any) => ({
     ...doc.data(),
     id: doc.id
   })) as Medicine[];
