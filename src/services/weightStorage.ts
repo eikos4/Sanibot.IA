@@ -1,3 +1,14 @@
+import {
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    query,
+    orderBy
+} from "firebase/firestore";
+import { auth, db } from "../firebase/config";
+
 export interface WeightEntry {
     id: string;
     date: string; // ISO String
@@ -6,37 +17,57 @@ export interface WeightEntry {
     bmi: number;
 }
 
-const HISTORY_KEY = "glucobot_weight_history";
-const VITALS_KEY = "glucobot_vitals"; // Keep for backward compatibility / quick access
-
-export const getWeightHistory = (): WeightEntry[] => {
-    const data = localStorage.getItem(HISTORY_KEY);
-    return data ? JSON.parse(data) : [];
+const getCollection = () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    return collection(db, "users", user.uid, "weight_history");
 };
 
-export const saveWeightEntry = (weight: number, height: number, bmi: number) => {
-    const history = getWeightHistory();
+export const getWeightHistory = async (): Promise<WeightEntry[]> => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return [];
 
-    const newEntry: WeightEntry = {
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
-        weight,
-        height,
-        bmi
-    };
+        const col = getCollection();
+        // Orden descendente por fecha
+        const q = query(col, orderBy("date", "desc"));
 
-    // Agregar al principio
-    const updatedHistory = [...history, newEntry];
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
-
-    // Update vitals key for other components
-    localStorage.setItem(VITALS_KEY, JSON.stringify({ w: weight, h: height }));
-
-    return newEntry;
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as WeightEntry));
+    } catch (e) {
+        console.error("Error fetching weight history", e);
+        return [];
+    }
 };
 
-export const deleteWeightEntry = (id: string) => {
-    const history = getWeightHistory();
-    const filtered = history.filter(h => h.id !== id);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+export const saveWeightEntry = async (weight: number, height: number, bmi: number) => {
+    try {
+        const col = getCollection();
+        const newEntry = {
+            date: new Date().toISOString(),
+            weight,
+            height,
+            bmi
+        };
+        const docRef = await addDoc(col, newEntry);
+        return { id: docRef.id, ...newEntry };
+    } catch (e) {
+        console.error("Error saving weight", e);
+        throw e;
+    }
+};
+
+export const deleteWeightEntry = async (id: string) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const docRef = doc(db, "users", user.uid, "weight_history", id);
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.error("Error deleting weight", e);
+        throw e;
+    }
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui/Card";
-import { saveWeightEntry } from "../services/weightStorage";
+import { getWeightHistory, saveWeightEntry } from "../services/weightStorage";
 
 export default function BMICalculator() {
     const [weight, setWeight] = useState("");
@@ -9,14 +9,17 @@ export default function BMICalculator() {
     const [status, setStatus] = useState({ label: "", color: "" });
 
     useEffect(() => {
-        // Cargar datos guardados
-        const saved = localStorage.getItem("glucobot_vitals");
-        if (saved) {
-            const { w, h } = JSON.parse(saved);
-            if (w) setWeight(w);
-            if (h) setHeight(h);
-            calculate(w, h);
-        }
+        const loadLast = async () => {
+            const history = await getWeightHistory();
+            if (history.length > 0) {
+                // history is stored in desc order per my query
+                const last = history[0];
+                setWeight(last.weight.toString());
+                setHeight(last.height.toString());
+                calculate(last.weight.toString(), last.height.toString());
+            }
+        };
+        loadLast();
     }, []);
 
     const calculate = (wStr: string, hStr: string) => {
@@ -38,8 +41,8 @@ export default function BMICalculator() {
         }
     };
 
-    const handleSave = () => {
-        saveWeightEntry(parseFloat(weight), parseFloat(height), bmi || 0);
+    const handleSave = async () => {
+        await saveWeightEntry(parseFloat(weight), parseFloat(height), bmi || 0);
         calculate(weight, height);
         if (bmi) {
             alert(`Datos guardados en historial. Tu IMC es ${bmi.toFixed(1)}`);

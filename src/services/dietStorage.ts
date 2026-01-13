@@ -1,3 +1,15 @@
+import {
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    updateDoc,
+    query,
+    orderBy
+} from "firebase/firestore";
+import { auth, db } from "../firebase/config";
+
 export interface MealPlan {
     id: string;
     type: 'Desayuno' | 'Almuerzo' | 'Once' | 'Cena' | 'Colación';
@@ -6,36 +18,60 @@ export interface MealPlan {
     enabled: boolean;
 }
 
-const STORAGE_KEY = "glucobot_diet_plan";
-
-export const getDietPlan = (): MealPlan[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+const getCollection = () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+    return collection(db, "users", user.uid, "diet_plan");
 };
 
-export const saveMeal = (meal: MealPlan) => {
-    const current = getDietPlan();
-    // Si ya existe (update), si no (add)
-    const index = current.findIndex(m => m.id === meal.id);
-    if (index >= 0) {
-        current[index] = meal;
-    } else {
-        current.push(meal);
+export const getDietPlan = async (): Promise<MealPlan[]> => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return [];
+
+        const col = getCollection();
+        const q = query(col, orderBy("time", "asc"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as MealPlan));
+    } catch (e) {
+        console.error("Error getting diet plan", e);
+        return [];
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
 };
 
-export const deleteMeal = (id: string) => {
-    const current = getDietPlan();
-    const updated = current.filter(m => m.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+export const saveMeal = async (meal: Omit<MealPlan, "id">) => {
+    try {
+        const col = getCollection();
+        await addDoc(col, meal);
+    } catch (e) {
+        console.error("Error saving meal", e);
+        throw e;
+    }
 };
 
-export const toggleMealStatus = (id: string) => {
-    const current = getDietPlan();
-    const meal = current.find(m => m.id === id);
-    if (meal) {
-        meal.enabled = !meal.enabled;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+export const deleteMeal = async (id: string) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const docRef = doc(db, "users", user.uid, "diet_plan", id);
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.error("Error deleting meal", e);
+        throw e;
+    }
+};
+
+export const toggleMealStatus = async (id: string, currentStatus: boolean) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const docRef = doc(db, "users", user.uid, "diet_plan", id);
+        await updateDoc(docRef, { enabled: !currentStatus });
+    } catch (e) {
+        console.error("Error toggling meal status", e);
+        throw e;
     }
 };

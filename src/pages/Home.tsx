@@ -22,6 +22,7 @@ interface HomeProps {
   // New props for async data
   lastGlucose?: any;
   glucoseHistory?: any[];
+  nextAppointment?: any;
 }
 
 export default function Home() {
@@ -31,6 +32,7 @@ export default function Home() {
   // States for async data
   const [lastGlucose, setLastGlucose] = useState<any>(null);
   const [glucoseHistory, setGlucoseHistory] = useState<any[]>([]);
+  const [nextAppointment, setNextAppointment] = useState<any>(null);
 
   const navigate = useNavigate();
 
@@ -44,6 +46,9 @@ export default function Home() {
 
       const history = await getGlucoseHistory();
       setGlucoseHistory(history);
+
+      const nextApp = await getNextAppointment();
+      setNextAppointment(nextApp);
     };
     fetchData();
 
@@ -67,6 +72,7 @@ export default function Home() {
       navigate={navigate}
       lastGlucose={lastGlucose}
       glucoseHistory={glucoseHistory}
+      nextAppointment={nextAppointment}
     />
   ) : (
     <HomeMobile
@@ -75,12 +81,13 @@ export default function Home() {
       navigate={navigate}
       lastGlucose={lastGlucose}
       glucoseHistory={glucoseHistory}
+      nextAppointment={nextAppointment}
     />
   );
 }
 
 /* --------------------------  MODO DESKTOP  -------------------------- */
-function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory }: HomeProps) {
+function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory, nextAppointment }: HomeProps) {
   return (
     <div className="desktop-container">
       {/* SIDEBAR */}
@@ -125,12 +132,11 @@ function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory 
               <div style={{ fontSize: "12px", color: "#666" }}>Próxima Cita</div>
               <div style={{ fontSize: "16px", fontWeight: "bold", color: "#6366F1" }}>
                 {(() => {
-                  const next = getNextAppointment();
-                  if (!next) return "Sin citas pendientes";
+                  if (!nextAppointment) return "Sin citas pendientes";
                   const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-                  const d = new Date(next.fecha);
+                  const d = new Date(nextAppointment.fecha);
                   // Ajustamos por la zona horaria si es necesario o asumimos local
-                  return `${dias[d.getDay()]} ${d.getDate()} - ${next.hora}`;
+                  return `${dias[d.getDay()]} ${d.getDate()} - ${nextAppointment.hora}`;
                 })()}
               </div>
             </div>
@@ -469,7 +475,7 @@ function bigCard(icon: string, title: string, path: string, bgColor: string, acc
 }
 
 /* --------------------------  MODO MOBILE  -------------------------- */
-function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory }: HomeProps) {
+function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, nextAppointment }: HomeProps) {
   return (
     <div className="mobile-container">
       {/* Hero Section */}
@@ -489,6 +495,18 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory }
               <div style={{ fontSize: "12px", color: "#666" }}>Última Glicemia</div>
               <div style={{ fontSize: "18px", fontWeight: "bold", color: (lastGlucose?.valor || 0) > 180 ? "#EF4444" : "#10B981" }}>
                 {lastGlucose ? `${lastGlucose.valor} mg/dL` : "Sin datos"}
+              </div>
+            </div>
+            {/* WIDGET MOBILE PROX CITA */}
+            <div style={{ flex: 1, background: "#fff", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontSize: "12px", color: "#666" }}>Próxima Cita</div>
+              <div style={{ fontSize: "15px", fontWeight: "bold", color: "#6366F1" }}>
+                {(() => {
+                  if (!nextAppointment) return "Sin citas";
+                  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+                  const d = new Date(nextAppointment.fecha);
+                  return `${dias[d.getDay()]} ${d.getDate()} - ${nextAppointment.hora}`;
+                })()}
               </div>
             </div>
           </div>

@@ -14,8 +14,8 @@ export default function Food() {
     enabled: true
   });
 
-  const load = () => {
-    const data = getDietPlan();
+  const load = async () => {
+    const data = await getDietPlan();
     // Ordenar por hora
     data.sort((a, b) => a.time.localeCompare(b.time));
     setPlans(data);
@@ -25,26 +25,32 @@ export default function Food() {
     load();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.time || !form.description) return alert("Completa la hora y descripción");
 
-    const newMeal = { ...form, id: form.id || Date.now().toString() };
-    saveMeal(newMeal);
+    // Remove id from form if it exists (it's empty string initially)
+    const { id, ...rest } = form;
+    const newMeal = { ...rest };
+
+    await saveMeal(newMeal);
     setIsAdding(false);
     setForm({ id: "", type: "Colación", time: "", description: "", enabled: true });
     load();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("¿Borrar esta comida?")) {
-      deleteMeal(id);
+      await deleteMeal(id);
       load();
     }
   };
 
-  const handleToggle = (id: string) => {
-    toggleMealStatus(id);
-    load();
+  const handleToggle = async (id: string) => {
+    const meal = plans.find(p => p.id === id);
+    if (meal) {
+      await toggleMealStatus(id, meal.enabled);
+      load();
+    }
   };
 
   return (

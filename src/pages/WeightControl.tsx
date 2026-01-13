@@ -6,8 +6,9 @@ import { getWeightHistory, type WeightEntry } from "../services/weightStorage";
 export default function WeightControl() {
     const [history, setHistory] = useState<WeightEntry[]>([]);
 
-    const loadHistory = () => {
-        setHistory(getWeightHistory());
+    const loadHistory = async () => {
+        const data = await getWeightHistory();
+        setHistory(data);
     };
 
     useEffect(() => {
