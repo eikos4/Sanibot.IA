@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 // @ts-ignore
 import { getPatientData } from "../services/patientStorage";
+import { getAppointments } from "../services/appointmentStorage";
+// @ts-ignore
+import { getMedicines } from "../services/medicineStorage";
 import BMICalculator from "../components/BMICalculator";
 
+// Interfaces
 interface PatientData {
   nombre: string;
   rut: string;
@@ -16,6 +20,8 @@ interface PatientData {
 
 export default function Profile() {
   const [patient, setPatient] = useState<PatientData | null>(null);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [medicines, setMedicines] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -24,6 +30,13 @@ export default function Profile() {
       if (data) {
         setPatient(data as PatientData);
       }
+
+      const apps = await getAppointments();
+      setAppointments(apps);
+
+      // @ts-ignore
+      const meds = await getMedicines();
+      setMedicines(meds);
     };
     fetchProfile();
   }, []);
@@ -31,8 +44,8 @@ export default function Profile() {
   if (!patient) {
     return (
       <div style={{ textAlign: "center", padding: "20px" }}>
-        <h2>Perfil no encontrado</h2>
-        <p>Por favor completa tu registro.</p>
+        <h2>Perfil no encontrado or cargando...</h2>
+        <p>Por favor espera o completa tu registro.</p>
         <button style={btn} onClick={() => window.location.href = "/register"}>Registrarme</button>
       </div>
     );
@@ -43,7 +56,7 @@ export default function Profile() {
       <h2 style={{ textAlign: "center" }}>Mi Perfil</h2>
 
       <div style={card}>
-        <div style={avatar}>{patient.nombre.charAt(0).toUpperCase()}</div>
+        <div style={avatar}>{patient.nombre ? patient.nombre.charAt(0).toUpperCase() : "?"}</div>
         <h3 style={{ margin: "10px 0 5px" }}>{patient.nombre}</h3>
         <p style={{ color: "#666", margin: 0 }}>{patient.rut}</p>
       </div>
@@ -98,13 +111,11 @@ export default function Profile() {
         <div style={section}>
           <h4 style={sectionTitle}>💊 Mis Medicamentos</h4>
           {(() => {
-            // @ts-ignore
-            const meds = JSON.parse(localStorage.getItem("glucobot_medicines") || "[]");
-            if (meds.length === 0) return <p style={{ color: "#666" }}>No hay medicamentos registrados.</p>;
-            return meds.slice(0, 2).map((m: any, i: number) => (
+            if (medicines.length === 0) return <p style={{ color: "#666" }}>No hay medicamentos registrados.</p>;
+            return medicines.slice(0, 2).map((m: any, i: number) => (
               <div key={i} style={row}>
                 <span>{m.nombre}</span>
-                <strong>{m.horario}</strong>
+                <strong>{m.horario ? m.horario : (m.horarios && m.horarios[0]) || ""}</strong>
               </div>
             ));
           })()}
@@ -117,11 +128,9 @@ export default function Profile() {
         <div style={section}>
           <h4 style={sectionTitle}>📅 Próxima Visita Médica</h4>
           {(() => {
-            // @ts-ignore
-            const apps = JSON.parse(localStorage.getItem("glucobot_appointments") || "[]");
-            if (apps.length === 0) return <p style={{ color: "#666" }}>No hay citas agendadas.</p>;
-            // Encontrar próxima (simple sort local para display rápido)
-            const next = apps.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+            if (appointments.length === 0) return <p style={{ color: "#666" }}>No hay citas agendadas.</p>;
+            // Encontrar próxima
+            const next = appointments.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
               .find((a: any) => new Date(`${a.fecha}T23:59`) >= new Date());
 
             if (!next) return <p style={{ color: "#666" }}>No tienes citas futuras.</p>;

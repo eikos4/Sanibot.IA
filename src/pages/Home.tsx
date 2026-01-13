@@ -26,7 +26,7 @@ interface HomeProps {
 }
 
 export default function Home() {
-  const [patient, setPatient] = useState(null);
+  const [patient, setPatient] = useState<User | null>(null);
   const [greeting, setGreeting] = useState("¡Hola!");
   const [isDesktop, setIsDesktop] = useState(false);
   // States for async data

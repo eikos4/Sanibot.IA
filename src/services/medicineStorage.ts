@@ -67,8 +67,15 @@ export const deleteMedicine = async (id: string) => {
 
 // Legacy support / One-time fetch if needed
 // But we should prefer subscription
-export const getMedicinesOnce = async (): Promise<Medicine[]> => {
-  // Implementation deferred, prefer subscription
-  return [];
+export const getMedicines = async (): Promise<Medicine[]> => {
+  const user = auth.currentUser;
+  if (!user) return [];
+
+  const q = query(collection(db, COLLECTION), where("userId", "==", user.uid));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id
+  })) as Medicine[];
 };
 
