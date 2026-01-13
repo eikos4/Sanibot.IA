@@ -5,8 +5,7 @@ import {
     query,
     orderBy,
     limit,
-    serverTimestamp,
-    Timestamp
+    serverTimestamp
 } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 

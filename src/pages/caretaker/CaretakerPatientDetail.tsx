@@ -12,18 +12,25 @@ export default function CaretakerPatientDetail() {
 
 
   useEffect(() => {
-    const readings = getGlucoseReadings();
-    if (readings && readings.length > 0) {
-      setLastGlucose(readings[readings.length - 1]);
-    }
+    const fetchData = async () => {
+      // @ts-ignore
+      const readings = await getGlucoseReadings();
+      if (readings && readings.length > 0) {
+        // Readings are sorted asc (old -> new) or desc? 
+        // getGlucoseHistory returns orderBy("fecha", "asc"), so last is newest?
+        // Let's check logic: reading[length-1] is last. Yes.
+        // But getGlucoseHistory in glucoseStorage.ts (Step 576) sorts ASC.
+        // So last element is newest.
+        setLastGlucose(readings[readings.length - 1]);
+      }
+    };
+    fetchData();
+
     // Subscribe to patient's medicines (assuming id is patientId)
     // Note: If id is undefined, it returns empty
-    // @ts-ignore
     const unsubscribe = subscribeToMedicines((meds) => {
       setMedicineCount(meds.length);
-    }); // We are not passing ID yet as we don't know if 'id' from params is the userId. 
-    // For now, assuming current user or empty. 
-    // If this page is for viewing *another* patient, we'd pass `id`.
+    });
 
     return () => unsubscribe();
   }, []);

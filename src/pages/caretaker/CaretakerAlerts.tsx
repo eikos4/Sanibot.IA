@@ -6,31 +6,46 @@ export default function CaretakerAlerts() {
   const [alerts, setAlerts] = useState<string[]>([]);
 
   useEffect(() => {
-    const readings = getGlucoseReadings();
-    const newAlerts: string[] = [];
+    const fetchAlerts = async () => {
+      // @ts-ignore
+      const readings = await getGlucoseReadings();
+      const newAlerts: string[] = [];
 
-    // Análisis simple de datos para generar alertas
-    if (readings) {
-      readings.forEach((r: any) => {
-        const val = parseInt(r.value);
-        // Si es muy reciente (ej. hoy) y es alto/bajo
-        const date = new Date(r.date);
-        const today = new Date();
-        const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
+      // Análisis simple de datos para generar alertas
+      if (readings) {
+        readings.forEach((r: any) => {
+          // r.valor is the new field, r.value might be old. Check interface. 
+          // Interface says 'valor'. 'value' might be old data or legacy.
+          // r.fecha instead of r.date.
+          const val = r.valor || r.value;
 
-        if (isToday) {
-          if (val > 180) newAlerts.push(`Glicemia ALTA (${val} mg/dL) a las ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
-          if (val < 70) newAlerts.push(`Glicemia BAJA (${val} mg/dL) a las ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
-        }
-      });
-    }
+          let date;
+          if (r.fecha) {
+            date = new Date(`${r.fecha}T${r.hora || "00:00"}`);
+          } else if (r.date) {
+            date = new Date(r.date);
+          } else {
+            date = new Date();
+          }
 
-    if (newAlerts.length === 0) {
-      // Alerta mock si no hay datos reales para demo
-      newAlerts.push("No se han detectado anomalías hoy.");
-    }
+          const today = new Date();
+          const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
 
-    setAlerts(newAlerts);
+          if (isToday) {
+            if (val > 180) newAlerts.push(`Glicemia ALTA (${val} mg/dL) a las ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
+            if (val < 70) newAlerts.push(`Glicemia BAJA (${val} mg/dL) a las ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
+          }
+        });
+      }
+
+      if (newAlerts.length === 0) {
+        // Alerta mock si no hay datos reales para demo
+        newAlerts.push("No se han detectado anomalías hoy.");
+      }
+
+      setAlerts(newAlerts);
+    };
+    fetchAlerts();
   }, []);
 
   return (
