@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // Import useAuth
 import { savePatientData } from "../services/patientStorage";
 import { register } from "../services/authService";
 import type { User } from "../services/authService";
@@ -7,9 +8,11 @@ import { validateRut, formatRut, cleanRut } from "../utils/validators";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { loginWithGoogle } = useAuth(); // Destructure loginWithGoogle
+
   const [form, setForm] = useState({
     nombre: "",
-    rut: "", // RUT Paciente
+    rut: "", // RUT o Email
     edad: "",
     password: "", // Pass Paciente
     confirmPassword: "",
@@ -33,9 +36,13 @@ export default function Register() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let { name, value } = e.target;
 
-    // Formateo automático de RUT
-    if (name === "rut" || name === "emergenciaRut") {
-      value = formatRut(value);
+    // Formateo automático de RUT solo si NO incluye @ y parece RUT
+    if ((name === "rut" || name === "emergenciaRut") && !value.includes("@")) {
+      // Simple check to avoid formatting emails
+      const clean = value.replace(/[^0-9kK]/g, '');
+      if (clean.length > 1) {
+        value = formatRut(value);
+      }
     }
 
     setForm({ ...form, [name]: value });
@@ -51,8 +58,16 @@ export default function Register() {
     // 1. Paciente
     if (!form.nombre.trim()) newErrors.nombre = "El nombre es obligatorio.";
 
-    if (!form.rut) newErrors.rut = "El RUT es obligatorio.";
-    else if (!validateRut(form.rut)) newErrors.rut = "RUT inválido.";
+    // Validate Rut OR Email
+    if (!form.rut) {
+      newErrors.rut = "RUT o Email es obligatorio.";
+    } else if (form.rut.includes("@")) {
+      // Basic email validation
+      if (!/\S+@\S+\.\S+/.test(form.rut)) newErrors.rut = "Email inválido.";
+    } else {
+      // Validate as RUT
+      if (!validateRut(form.rut)) newErrors.rut = "RUT inválido.";
+    }
 
     if (!form.password) newErrors.password = "La contraseña es obligatoria.";
     else if (form.password.length < 6) newErrors.password = "Mínimo 6 caracteres.";
@@ -84,38 +99,36 @@ export default function Register() {
 
     // 3. Registrar Paciente
     const newPatient: User = {
-      id: Date.now().toString(),
-      username: cleanRut(form.rut), // Guardamos RUT limpio como username
-      password: form.password,
+      id: "", // Will be set by Firebase
+      username: form.rut.includes("@") ? form.rut : cleanRut(form.rut),
       name: form.nombre,
       // @ts-ignore
       role: form.rol
     };
 
-    const patientRegistered = await register(newPatient);
+    const patientRegistered = await register(newPatient, form.password);
     if (!patientRegistered) {
-      alert("El RUT del paciente ya está registrado.");
+      alert("El RUT/Email ya está registrado o hubo un error.");
       return;
     }
 
     // 4. Registrar Cuidador (automáticamente)
     if (form.rol === "patient" && hasCaretaker) {
       const newCaretaker: User = {
-        id: (Date.now() + 1).toString(),
+        id: "",
         username: cleanRut(form.emergenciaRut),
-        password: form.emergenciaPassword,
         name: form.emergenciaNombre,
         role: "caretaker"
       };
 
-      const caretakerRegistered = await register(newCaretaker);
+      const caretakerRegistered = await register(newCaretaker, form.emergenciaPassword);
       if (!caretakerRegistered) {
         alert("Advertencia: El paciente se creó, pero el RUT del cuidador ya existía. Verifica los datos.");
       } else {
-        savePatientData(form);
+        await savePatientData(form);
       }
     } else {
-      savePatientData(form);
+      await savePatientData(form);
     }
 
     navigate("/register-complete");
@@ -139,6 +152,49 @@ export default function Register() {
         Completa tu información y asigna a tu cuidador.
       </p>
 
+      {/* BOTÓN GOOGLE */}
+      <button
+        onClick={async () => {
+          const user = await loginWithGoogle();
+          if (user) {
+            if (!user.profileCompleted && user.role === 'patient') {
+              navigate("/onboarding");
+              return;
+            }
+            if (user.role === 'admin') navigate("/admin");
+            else if (user.role === 'caretaker') navigate("/caretaker");
+            else navigate("/home");
+          }
+        }}
+        style={{
+          width: "100%",
+          padding: "12px",
+          marginBottom: "20px",
+          borderRadius: "12px",
+          border: "1px solid #E5E7EB",
+          background: "white",
+          color: "#374151",
+          fontSize: "15px",
+          fontWeight: "500",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+          cursor: "pointer",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
+        }}
+      >
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google" />
+        Continuar con Google
+      </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#9CA3AF" }}>
+        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
+        <span style={{ fontSize: "14px" }}>o crea tu cuenta</span>
+        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
+      </div>
+
+
       {/* CREDENCIALES PACIENTE */}
       <h3 style={sectionTitle}>👤 Tus Datos de Ingreso</h3>
 
@@ -151,7 +207,7 @@ export default function Register() {
       </div>
 
       <div style={{ marginBottom: "10px" }}>
-        <input style={input} name="rut" placeholder="Tu RUT" onChange={handleChange} value={form.rut} maxLength={12} />
+        <input style={input} name="rut" placeholder="Tu RUT o Email" onChange={handleChange} value={form.rut} maxLength={50} />
         {errors.rut && <span style={errorText}>{errors.rut}</span>}
       </div>
 

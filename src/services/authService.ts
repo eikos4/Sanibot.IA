@@ -1,78 +1,149 @@
+import {
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    updateProfile,
+    GoogleAuthProvider,
+    signInWithPopup
+} from "firebase/auth";
+import type { User as FirebaseUser } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase/config";
+
 export interface User {
     id: string;
-    username: string; // Será el RUT
-    password?: string; // Solo para guardar, no retornar al front si es posible evitarlo
+    username: string; // Email en Firebase (o RUT convertido)
     name: string;
     role: "patient" | "caretaker" | "admin";
+    profileCompleted?: boolean;
 }
 
-const STORAGE_KEY = "glucobot_users_db";
-const SESSION_KEY = "glucobot_current_user";
-
-// Inicializar admin por defecto si no existe
-const initAdmin = () => {
-    const users = getUsers();
-    if (!users.find(u => u.username === "admin")) {
-        users.push({
-            id: "admin-id",
-            username: "admin",
-            password: "admin123",
-            name: "Administrador Principal",
-            role: "admin"
-        });
-        saveUsers(users);
+// Helper to get user profile from Firestore
+const getProfile = async (uid: string): Promise<User | null> => {
+    try {
+        const docRef = doc(db, "users", uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return { id: uid, ...docSnap.data() } as User;
+        }
+    } catch (e) {
+        console.error("Error fetching profile", e);
     }
-};
-
-const getUsers = (): User[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-};
-
-const saveUsers = (users: User[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-};
-
-export const register = async (user: User): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simular red
-    const users = getUsers();
-
-    if (users.find(u => u.username === user.username)) {
-        return false; // Usuario ya existe (RUT duplicado)
-    }
-
-    users.push(user);
-    saveUsers(users);
-    return true;
-};
-
-export const login = async (username: string, password?: string): Promise<User | null> => {
-    initAdmin(); // Asegurar que admin existe
-    await new Promise(resolve => setTimeout(resolve, 800)); // Simular red
-
-    const users = getUsers();
-    const user = users.find(u => u.username === username);
-
-    // Validación simplificada: Si no llega password (caso legacy o admin switch), entra directo.
-    // PERO en sistema real, siempre debería llegar password.
-    // Para compatibilidad con el código anterior, si password es undefined, fallamos a menos que sea un mock específico o lo manejamos.
-
-    // CASO REAL:
-    if (user && user.password === password) {
-        const { password: _, ...userSafe } = user;
-        localStorage.setItem(SESSION_KEY, JSON.stringify(userSafe));
-        // @ts-ignore
-        return userSafe;
-    }
-
     return null;
 };
 
-export const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
+// Helper to ensure username is an email (for Firebase Auth)
+const toEmail = (username: string) => {
+    // Basic email regex/check
+    if (username.includes("@")) return username;
+    // If it looks like a RUT (numbers + k), append domain
+    return `${username.replace(/\./g, '')}@glucobot.app`;
 };
 
-export const getCurrentUser = (): User | null => {
-    const user = localStorage.getItem(SESSION_KEY);
-    return user ? JSON.parse(user) : null;
+export const loginWithGoogle = async (): Promise<User | null> => {
+    try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const fbUser = result.user;
+
+        // Check if user exists in Firestore, if not create it
+        let profile = await getProfile(fbUser.uid);
+
+        if (!profile) {
+            // New Google User -> Create defaults
+            profile = {
+                id: fbUser.uid,
+                username: fbUser.email || "",
+                name: fbUser.displayName || "Usuario Google",
+                role: "patient" // Default role for Google Sign-In
+            };
+
+            await setDoc(doc(db, "users", fbUser.uid), {
+                username: profile.username,
+                email: fbUser.email,
+                name: profile.name,
+                role: profile.role
+            });
+        }
+
+        return profile;
+    } catch (error) {
+        console.error("Error with Google Sign-In", error);
+        return null;
+    }
+};
+
+export const register = async (user: User, password?: string): Promise<boolean> => {
+    if (!password) {
+        console.error("Password is required for Firebase registration");
+        return false;
+    }
+    const email = toEmail(user.username);
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const fbUser = userCredential.user;
+
+        // Update Display Name
+        await updateProfile(fbUser, { displayName: user.name });
+
+        // Save extra data (Rol) to Firestore
+        await setDoc(doc(db, "users", fbUser.uid), {
+            username: user.username, // Save ORIGINAL username (RUT or Email)
+            email: email,
+            name: user.name,
+            role: user.role
+        });
+
+        return true;
+    } catch (error) {
+        console.error("Error registering:", error);
+        return false;
+    }
+};
+
+export const login = async (username: string, password?: string): Promise<User | null> => {
+    if (!password) return null;
+    const email = toEmail(username);
+
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // Fetch full profile including Role
+        const profile = await getProfile(userCredential.user.uid);
+        return profile || {
+            id: userCredential.user.uid,
+            username: username, // Return the input username if profile not found
+            name: userCredential.user.displayName || "Usuario",
+            role: "patient" // Fallback
+        };
+    } catch (error) {
+        console.error("Error logging in:", error);
+        return null;
+    }
+};
+
+export const logout = async () => {
+    try {
+        await signOut(auth);
+    } catch (error) {
+        console.error("Error signing out:", error);
+    }
+};
+
+// Listener para cambios de estado con fetch de perfil
+export const subscribeToAuthChanges = (callback: (user: User | null) => void) => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+            const profile = await getProfile(firebaseUser.uid);
+            callback(profile || {
+                id: firebaseUser.uid,
+                username: firebaseUser.email || "",
+                name: firebaseUser.displayName || "Usuario",
+                role: "patient"
+            });
+        } else {
+            callback(null);
+        }
+    });
 };

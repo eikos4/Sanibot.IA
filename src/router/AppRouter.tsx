@@ -9,6 +9,7 @@ import Splash from "../pages/Splash";
 import Welcome from "../pages/Welcome";
 import Register from "../pages/Register";
 import RegisterComplete from "../pages/RegisterComplete";
+import Onboarding from "../pages/Onboarding";
 
 /* Paciente */
 import Home from "../pages/Home";
@@ -59,6 +60,8 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/register-complete" element={<RegisterComplete />} />
+        {/* Onboarding for Google Users */}
+        <Route path="/onboarding" element={<Onboarding />} />
 
         {/* PÁGINAS CON LAYOUT */}
         {/* PÁGINAS CON LAYOUT (PROTEGIDAS) */}

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { login as authLogin, logout as authLogout, getCurrentUser } from "../services/authService";
+import { login as authLogin, logout as authLogout, subscribeToAuthChanges, loginWithGoogle as authLoginGoogle } from "../services/authService";
 import type { User } from "../services/authService";
 
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: (username: string, password?: string) => Promise<boolean>;
+    login: (username: string, password?: string) => Promise<User | null>;
+    loginWithGoogle: () => Promise<User | null>;
     logout: () => void;
 }
 
@@ -16,35 +17,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Check for persisted session on mount
-        const savedUser = getCurrentUser();
-        if (savedUser) {
-            setUser(savedUser);
-        }
-        setIsLoading(false);
+        // Subscribe to Firebase Auth state
+        const unsubscribe = subscribeToAuthChanges((firebaseUser: User | null) => {
+            setUser(firebaseUser);
+            setIsLoading(false);
+        });
+
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
     }, []);
 
-    const login = async (username: string, password?: string): Promise<boolean> => {
+    const login = async (username: string, password?: string): Promise<User | null> => {
         setIsLoading(true);
         try {
             const user = await authLogin(username, password);
-            if (user) {
-                setUser(user);
-                return true;
-            }
-            return false;
+            // State update handled by subscription
+            return user;
+        } catch (e) {
+            return null;
         } finally {
             setIsLoading(false);
         }
     };
 
-    const logout = () => {
-        authLogout();
-        setUser(null);
+    const loginWithGoogle = async (): Promise<User | null> => {
+        setIsLoading(true);
+        try {
+            const user = await authLoginGoogle();
+            return user;
+        } catch (e) {
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const logout = async () => {
+        await authLogout();
+        // State update handled by subscription
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+        <AuthContext.Provider value={{ user, isLoading, login, loginWithGoogle, logout }}>
             {children}
         </AuthContext.Provider>
     );

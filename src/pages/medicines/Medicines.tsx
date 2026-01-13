@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMedicines, deleteMedicine } from "../../services/medicineStorage";
+import { subscribeToMedicines, deleteMedicine } from "../../services/medicineStorage";
 import type { Medicine } from "../../services/medicineStorage";
 
 export default function Medicines() {
@@ -8,13 +8,16 @@ export default function Medicines() {
   const [meds, setMeds] = useState<Medicine[]>([]);
 
   useEffect(() => {
-    setMeds(getMedicines());
+    const unsubscribe = subscribeToMedicines((data) => {
+      setMeds(data);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: string) => {
     if (confirm("¿Estás seguro de eliminar este medicamento?")) {
-      deleteMedicine(id);
-      setMeds(getMedicines());
+      await deleteMedicine(id);
+      // No need to refresh, subscription handles it
     }
   };
 

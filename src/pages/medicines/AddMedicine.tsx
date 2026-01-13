@@ -1,8 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { addMedicine } from "../../services/medicineStorage";
 import type { Medicine } from "../../services/medicineStorage";
 
 export default function AddMedicine() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     nombre: "",
     dosis: "",
@@ -33,15 +35,13 @@ export default function AddMedicine() {
     setHorarios(times.sort());
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nombre || !form.dosis || horarios.length === 0) {
       alert("Por favor completa nombre, dosis y agrega al menos un horario.");
       return;
     }
 
-    // @ts-ignore
-    const newMed: Medicine = {
-      id: Date.now(),
+    const newMed: Omit<Medicine, "id" | "userId"> = {
       nombre: form.nombre,
       dosis: form.dosis,
       horarios: horarios,
@@ -50,9 +50,13 @@ export default function AddMedicine() {
       endDate: form.endDate
     };
 
-    // @ts-ignore
-    addMedicine(newMed);
-    window.location.href = "/medicines";
+    try {
+      await addMedicine(newMed);
+      navigate("/medicines");
+    } catch (error) {
+      console.error("Error adding medicine:", error);
+      alert("Error al guardar. Inténtalo de nuevo.");
+    }
   };
 
   return (

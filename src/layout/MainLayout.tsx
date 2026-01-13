@@ -4,8 +4,7 @@ import BottomNav from "../components/BottomNav";
 import SaniBot from "../components/SaniBot";
 // @ts-ignore
 import SimulatedCall from "../components/SimulatedCall";
-import { getMedicines } from "../services/medicineStorage";
-import type { Medicine } from "../services/medicineStorage";
+import { subscribeToMedicines } from "../services/medicineStorage";
 
 export default function MainLayout() {
   const location = useLocation();
@@ -29,34 +28,43 @@ export default function MainLayout() {
 
   // AUTOMATIZACIÓN DE RECORDATORIOS
   useEffect(() => {
-    const checkMedicines = () => {
-      // Helper para chequear hora
+    // Subscription for medicines
+    const unsubscribeMeds = subscribeToMedicines((meds) => {
+      const checkTime = () => {
+        const now = new Date();
+        const currentHour = now.getHours().toString().padStart(2, '0');
+        const currentMinute = now.getMinutes().toString().padStart(2, '0');
+        const currentTime = `${currentHour}:${currentMinute}`;
+        const todayStr = now.toDateString();
+
+        meds.forEach(med => {
+          const times = med.horarios || [];
+          times.forEach((t: string) => {
+            const alertKey = `alert_${todayStr}_${med.id}_${t}`;
+            if (t === currentTime && !localStorage.getItem(alertKey)) {
+              setCallMessage(`Hola. Es hora de tu medicamento: ${med.nombre}. Recuerda registrarlo.`);
+              setCallerName("Enfermera Virtual");
+              setCallActive(true);
+              localStorage.setItem(alertKey, "true");
+            }
+          });
+        });
+      };
+
+      // Check immediately and then every 10s
+      checkTime();
+      const interval = setInterval(checkTime, 10000);
+      return () => clearInterval(interval);
+    });
+
+    // Other checks (Diet, Insulin, Hydration) - still local for now
+    const checkOthers = () => {
       const now = new Date();
       const currentHour = now.getHours().toString().padStart(2, '0');
       const currentMinute = now.getMinutes().toString().padStart(2, '0');
       const currentTime = `${currentHour}:${currentMinute}`;
-
       const isTimeMatch = (targetTime: string) => targetTime === currentTime;
       const todayStr = now.toDateString();
-
-      // 1. CHECK MEDICINAS
-      const meds: Medicine[] = getMedicines();
-
-      meds.forEach(med => {
-        // Soporte para estructura nueva (horarios[]) y antigua (horario)
-        // @ts-ignore
-        const times = med.horarios || (med.horario ? [med.horario] : []);
-
-        times.forEach((t: string) => {
-          const alertKey = `alert_${todayStr}_${med.id}_${t}`;
-          if (isTimeMatch(t) && !localStorage.getItem(alertKey)) {
-            setCallMessage(`Hola. Es hora de tu medicamento: ${med.nombre}. Recuerda registrarlo.`);
-            setCallerName("Enfermera Virtual");
-            setCallActive(true);
-            localStorage.setItem(alertKey, "true");
-          }
-        });
-      });
 
       // 2. CHECK ALIMENTACIÓN (DIETA)
       try {
@@ -106,10 +114,15 @@ export default function MainLayout() {
           localStorage.setItem(alertKey, "true");
         }
       }
-    };
+    }
 
-    const interval = setInterval(checkMedicines, 10000); // Chequear cada 10 segundos para demo (en prod sería 60s)
-    return () => clearInterval(interval);
+    const intervalOthers = setInterval(checkOthers, 10000);
+
+    return () => {
+      // Unsubs are called when useEffect cleanup runs
+      if (typeof unsubscribeMeds === 'function') unsubscribeMeds(); // Ensure it's a function
+      clearInterval(intervalOthers);
+    };
   }, []);
 
   // Define isMobile for clarity, equivalent to !isDesktop

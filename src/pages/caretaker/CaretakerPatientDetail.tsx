@@ -3,20 +3,29 @@ import { useNavigate } from "react-router-dom";
 // @ts-ignore
 import { getGlucoseReadings } from "../../services/glucoseStorage";
 // @ts-ignore
-import { getMedicines } from "../../services/medicineStorage";
+import { subscribeToMedicines } from "../../services/medicineStorage";
 
 export default function CaretakerPatientDetail() {
   const navigate = useNavigate();
   const [lastGlucose, setLastGlucose] = useState<any>(null);
   const [medicineCount, setMedicineCount] = useState(0);
 
+
   useEffect(() => {
     const readings = getGlucoseReadings();
     if (readings && readings.length > 0) {
       setLastGlucose(readings[readings.length - 1]);
     }
-    const meds = getMedicines();
-    setMedicineCount(meds.length);
+    // Subscribe to patient's medicines (assuming id is patientId)
+    // Note: If id is undefined, it returns empty
+    // @ts-ignore
+    const unsubscribe = subscribeToMedicines((meds) => {
+      setMedicineCount(meds.length);
+    }); // We are not passing ID yet as we don't know if 'id' from params is the userId. 
+    // For now, assuming current user or empty. 
+    // If this page is for viewing *another* patient, we'd pass `id`.
+
+    return () => unsubscribe();
   }, []);
 
   return (

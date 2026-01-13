@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-    const { login } = useAuth();
+    const { login, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
     const [rut, setRut] = useState("");
     const [password, setPassword] = useState("");
@@ -35,14 +35,10 @@ export default function Login() {
         setLoading(true);
         setError("");
 
-        const success = await login(rut, password);
+        const currentUser = await login(rut, password);
         setLoading(false);
 
-        if (success) {
-            // Recuperamos el usuario guardado para validar el rol
-            // @ts-ignore
-            const currentUser = JSON.parse(localStorage.getItem("glucobot_current_user") || "{}");
-
+        if (currentUser) {
             // Validación estricta de rol
             if (currentUser.role !== role && currentUser.role !== 'admin') {
                 if (currentUser.role === 'caretaker' && role === 'patient') {
@@ -107,7 +103,51 @@ export default function Login() {
                     }}
                 />
                 <h1 style={{ marginBottom: "8px", color: "#1F2937" }}>Bienvenido</h1>
-                <p style={{ color: "#6B7280", marginBottom: "32px" }}>Ingresa a tu cuenta SanniBot.IA</p>
+                <p style={{ color: "#6B7280", marginBottom: "20px" }}>Ingresa a tu cuenta SanniBot.IA</p>
+
+                {/* BOTÓN GOOGLE */}
+                <button
+                    onClick={async () => {
+                        // Login logic
+                        const user = await loginWithGoogle();
+                        if (user) {
+                            if (!user.profileCompleted && user.role === 'patient') {
+                                navigate("/onboarding");
+                                return;
+                            }
+
+                            if (user.role === 'admin') navigate("/admin");
+                            else if (user.role === 'caretaker') navigate("/caretaker");
+                            else navigate("/home");
+                        }
+                    }}
+                    style={{
+                        width: "100%",
+                        padding: "12px",
+                        marginBottom: "20px",
+                        borderRadius: "12px",
+                        border: "1px solid #E5E7EB",
+                        background: "white",
+                        color: "#374151",
+                        fontSize: "15px",
+                        fontWeight: "500",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
+                    }}
+                >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google" />
+                    Continuar con Google
+                </button>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#9CA3AF" }}>
+                    <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
+                    <span style={{ fontSize: "14px" }}>o ingresa con</span>
+                    <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
+                </div>
 
                 {/* SELECTOR DE ROL */}
                 <div style={{ display: "flex", background: "#F3F4F6", padding: "4px", borderRadius: "12px", marginBottom: "20px" }}>
@@ -150,7 +190,7 @@ export default function Login() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                     <input
                         type="text"
-                        placeholder="RUT"
+                        placeholder="RUT o Email"
                         value={rut}
                         onChange={(e) => setRut(e.target.value)}
                         style={{
