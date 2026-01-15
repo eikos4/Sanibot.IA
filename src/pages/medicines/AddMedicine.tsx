@@ -12,6 +12,7 @@ export default function AddMedicine() {
     duration: "chronic",
     endDate: ""
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const [horarios, setHorarios] = useState<string[]>([]);
   const [tempTime, setTempTime] = useState("");
@@ -42,6 +43,8 @@ export default function AddMedicine() {
       return;
     }
 
+    setIsSaving(true);
+
     const newMed: Omit<Medicine, "id" | "userId"> = {
       nombre: form.nombre,
       dosis: form.dosis,
@@ -68,6 +71,8 @@ export default function AddMedicine() {
     } catch (error) {
       console.error("Error adding medicine:", error);
       alert("Error al guardar. Inténtalo de nuevo.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -196,7 +201,9 @@ export default function AddMedicine() {
         )}
       </div>
 
-      <button className="btn-save" onClick={handleSave}>Guardar Tratamiento</button>
+      <button className="btn-save" onClick={handleSave} disabled={isSaving}>
+        {isSaving ? "Guardando..." : "Guardar Tratamiento"}
+      </button>
 
       <style>
         {`

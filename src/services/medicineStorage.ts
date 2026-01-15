@@ -67,18 +67,25 @@ export const subscribeToMedicines = (callback: (meds: Medicine[]) => void, targe
   }
 };
 
+// Helper for timeout
+const timeoutPromise = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
+
 export const addMedicine = async (medicine: Omit<Medicine, "id" | "userId">) => {
   const uid = getCurrentUserId();
   if (!uid) throw new Error("User not authenticated");
 
   try {
-    await addDoc(collection(db, COLLECTION), {
-      ...medicine,
-      userId: uid,
-      createdAt: serverTimestamp()
-    });
+    // Race between Firestore and 3s timeout
+    await Promise.race([
+      addDoc(collection(db, COLLECTION), {
+        ...medicine,
+        userId: uid,
+        createdAt: serverTimestamp()
+      }),
+      timeoutPromise(3000)
+    ]);
   } catch (error) {
-    console.error("Firestore addMedicine failed, saving locally:", error);
+    console.error("Firestore addMedicine failed (or timed out), saving locally:", error);
     // Fallback to localStorage
     const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
     local.push({ ...medicine, id: Date.now().toString(), userId: uid });
