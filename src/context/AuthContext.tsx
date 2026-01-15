@@ -1,64 +1,53 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { login as authLogin, logout as authLogout, subscribeToAuthChanges, loginWithGoogle as authLoginGoogle } from "../services/authService";
-import type { User } from "../services/authService";
+
+// Simple local user type
+interface LocalUser {
+    id: string;
+    name: string;
+    email: string;
+    role: "patient" | "caretaker" | "admin";
+}
 
 interface AuthContextType {
-    user: User | null;
+    user: LocalUser | null;
     isLoading: boolean;
-    login: (username: string, password?: string) => Promise<User | null>;
-    loginWithGoogle: () => Promise<User | null>;
     logout: () => void;
+    refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<LocalUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        // Subscribe to Firebase Auth state
-        const unsubscribe = subscribeToAuthChanges((firebaseUser: User | null) => {
-            setUser(firebaseUser);
-            setIsLoading(false);
-        });
+    const refreshUser = () => {
+        const savedUser = localStorage.getItem("glucobot_current_user");
+        if (savedUser) {
+            setUser(JSON.parse(savedUser));
+        } else {
+            setUser(null);
+        }
+        setIsLoading(false);
+    };
 
-        // Cleanup subscription on unmount
-        return () => unsubscribe();
+    useEffect(() => {
+        // Check localStorage for current user on mount
+        refreshUser();
+
+        // Listen for storage changes (for multi-tab support)
+        const handleStorage = () => refreshUser();
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
     }, []);
 
-    const login = async (username: string, password?: string): Promise<User | null> => {
-        setIsLoading(true);
-        try {
-            const user = await authLogin(username, password);
-            // State update handled by subscription
-            return user;
-        } catch (e) {
-            return null;
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const loginWithGoogle = async (): Promise<User | null> => {
-        setIsLoading(true);
-        try {
-            const user = await authLoginGoogle();
-            return user;
-        } catch (e) {
-            return null;
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const logout = async () => {
-        await authLogout();
-        // State update handled by subscription
+    const logout = () => {
+        localStorage.removeItem("glucobot_current_user");
+        setUser(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, loginWithGoogle, logout }}>
+        <AuthContext.Provider value={{ user, isLoading, logout, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

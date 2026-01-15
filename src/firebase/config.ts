@@ -22,7 +22,13 @@ const app = initializeApp(firebaseConfig);
 
 // Export Auth and Firestore services
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore with long polling to avoid "offline" errors
+// Removed persistent cache as it can cause issues during initial setup
+export const db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    ignoreUndefinedProperties: true
+});

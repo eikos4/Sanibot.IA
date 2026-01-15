@@ -1,26 +1,31 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 // @ts-ignore
 import { getPatientData } from "../services/patientStorage";
 import { getAppointments } from "../services/appointmentStorage";
 // @ts-ignore
 import { getMedicines } from "../services/medicineStorage";
+import { deleteAccount } from "../services/authService";
 import BMICalculator from "../components/BMICalculator";
 
-// Interfaces
-interface PatientData {
-  nombre: string;
-  rut: string;
-  edad: string;
-  tipoDiabetes: string;
-  tipoSangre: string;
-  estadoCivil: string;
-  emergenciaNombre: string;
-  emergenciaTelefono: string;
-}
+import type { PatientData } from "../services/patientStorage";
 
 export default function Profile() {
+  const navigate = useNavigate();
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
+
+  const handleDeleteAccount = async () => {
+    if (confirm("¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer y borrará todos tus datos.")) {
+      const success = await deleteAccount();
+      if (success) {
+        alert("Cuenta eliminada correctamente.");
+        navigate("/onboarding"); // Or login
+      } else {
+        alert("Hubo un error al eliminar la cuenta. Por favor intenta de nuevo o contacta soporte.");
+      }
+    }
+  };
   const [medicines, setMedicines] = useState<any[]>([]);
 
   useEffect(() => {
@@ -64,10 +69,16 @@ export default function Profile() {
       <div style={section}>
         <h4 style={sectionTitle}>Datos Personales</h4>
         <div style={row}>
-          <span>Edad:</span> <strong>{patient.edad} años</strong>
+          <span>RUT:</span> <strong>{patient.rut}</strong>
         </div>
         <div style={row}>
-          <span>Estado Civil:</span> <strong>{patient.estadoCivil}</strong>
+          <span>Nacimiento:</span> <strong>{patient.fechaNacimiento}</strong>
+        </div>
+        <div style={row}>
+          <span>Género:</span> <strong>{patient.genero}</strong>
+        </div>
+        <div style={row}>
+          <span>Previsión:</span> <strong style={{ color: "#1F4FFF" }}>{patient.prevision}</strong>
         </div>
       </div>
 
@@ -77,19 +88,45 @@ export default function Profile() {
           <span>Diabetes:</span> <strong style={{ color: "#EF4444" }}>{patient.tipoDiabetes}</strong>
         </div>
         <div style={row}>
-          <span>Tipo de Sangre:</span> <strong>{patient.tipoSangre}</strong>
+          <span>Diagnóstico:</span> <strong>{patient.anioDiagnostico}</strong>
+        </div>
+
+        <div style={{ marginTop: "10px", padding: "10px", background: "#F3F4F6", borderRadius: "8px" }}>
+          <p style={{ margin: "0 0 5px", fontSize: "13px", fontWeight: "600" }}>Antecedentes / Comorbilidades:</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+            {patient.hipertension && <span style={tag}>Hipertensión</span>}
+            {patient.hipotiroidismo && <span style={tag}>Hipotiroidismo</span>}
+            {patient.dislipidemia && <span style={tag}>Dislipidemia</span>}
+            {patient.renal && <span style={tag}>Enf. Renal</span>}
+            {patient.antecedentesFamiliares && <span style={tag}>Ant. Familiares</span>}
+            {!patient.hipertension && !patient.hipotiroidismo && !patient.dislipidemia && !patient.renal && <span style={{ fontSize: "13px", color: "#666" }}>Sin otros antecedentes reportados.</span>}
+          </div>
+        </div>
+      </div>
+
+      <div style={section}>
+        <h4 style={sectionTitle}>Estilo de Vida</h4>
+        <div style={row}>
+          <span>Peso / Altura:</span> <strong>{patient.peso}kg / {patient.altura}cm</strong>
+        </div>
+        <div style={row}>
+          <span>Actividad:</span> <strong>{patient.actividadFisica}</strong>
+        </div>
+        <div style={row}>
+          <span>Fumador:</span> <strong>{patient.fumador ? "Sí 🚬" : "No"}</strong>
         </div>
       </div>
 
       <div style={section}>
         <h4 style={sectionTitle}>Contacto de Emergencia 🆘</h4>
         <div style={row}>
-          <span>Nombre:</span> <strong>{patient.emergenciaNombre}</strong>
+          <span>Nombre:</span> <strong>{patient.emergenciaNombre} ({patient.emergenciaRelacion})</strong>
         </div>
         <div style={row}>
-          <span>Teléfono:</span> <a href={`tel:${patient.emergenciaTelefono}`} style={{ color: "#1F4FFF" }}>Calling...</a>
-          {/* Simulación visual del link */}
-          <strong style={{ color: "#1F4FFF" }}>{patient.emergenciaTelefono}</strong>
+          <span>Teléfono:</span>
+          <a href={`tel:${patient.emergenciaTelefono}`} style={{ color: "#1F4FFF", fontWeight: "bold", textDecoration: "none" }}>
+            {patient.emergenciaTelefono}
+          </a>
         </div>
       </div>
 
@@ -98,6 +135,13 @@ export default function Profile() {
         onClick={() => alert("Función de editar en construcción")}
       >
         Editar Perfil
+      </button>
+
+      <button
+        style={{ ...btn, background: "#EF4444", marginTop: "15px" }}
+        onClick={handleDeleteAccount}
+      >
+        Eliminar Cuenta
       </button>
 
       {/* CALCULADORA IMC */}
@@ -210,4 +254,14 @@ const btn: React.CSSProperties = {
   fontSize: "18px",
   fontWeight: "bold",
   cursor: "pointer",
+};
+
+const tag: React.CSSProperties = {
+  fontSize: "12px",
+  background: "#DBEAFE",
+  color: "#1E40AF",
+  padding: "2px 8px",
+  borderRadius: "20px",
+  fontWeight: "500",
+  border: "1px solid #93C5FD"
 };

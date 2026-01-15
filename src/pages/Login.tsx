@@ -1,290 +1,194 @@
-import { useState, useEffect } from "react";
-import NeuralBackground from "../components/NeuralBackground";
-import { useAuth } from "../context/AuthContext";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../components/ui/Toast";
+
+// Simple local user storage
+const LOCAL_USERS_KEY = "glucobot_users";
+
+interface LocalUser {
+    id: string;
+    name: string;
+    email: string;
+    password: string;
+    role: "patient" | "caretaker";
+}
+
+const getLocalUsers = (): LocalUser[] => {
+    const data = localStorage.getItem(LOCAL_USERS_KEY);
+    return data ? JSON.parse(data) : [];
+};
 
 export default function Login() {
-    const { login, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
-    const [rut, setRut] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
 
-    const [role, setRole] = useState<"patient" | "caretaker">("patient");
-    const [rememberMe, setRememberMe] = useState(false);
+    const [form, setForm] = useState({
+        email: "",
+        password: ""
+    });
 
-    useEffect(() => {
-        const savedCreds = localStorage.getItem("glucobot_saved_credentials");
-        if (savedCreds) {
-            const { rut, password, remember } = JSON.parse(savedCreds);
-            if (remember) {
-                setRut(rut);
-                setPassword(password);
-                setRememberMe(true);
-            }
-        }
-    }, []);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = async () => {
-        if (!rut || !password) {
-            setError("Por favor ingresa RUT y contraseña");
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleLogin = () => {
+        if (!form.email.trim() || !form.password) {
+            toast("Ingresa correo y contraseña", "error");
             return;
         }
 
-        setLoading(true);
-        setError("");
+        setIsLoading(true);
 
-        const currentUser = await login(rut, password);
-        setLoading(false);
+        const users = getLocalUsers();
+        const user = users.find(
+            u => u.email.toLowerCase() === form.email.toLowerCase() && u.password === form.password
+        );
 
-        if (currentUser) {
-            // Validación estricta de rol
-            if (currentUser.role !== role && currentUser.role !== 'admin') {
-                if (currentUser.role === 'caretaker' && role === 'patient') {
-                    setError("Esta cuenta es de Cuidador. Por favor cambia la selección arriba.");
-                    return;
-                }
-                if (currentUser.role === 'patient' && role === 'caretaker') {
-                    setError("Esta cuenta es de Paciente. Por favor cambia la selección arriba.");
-                    return;
-                }
-            }
-
-            // Redirección
-            if (currentUser.role === 'admin') navigate("/admin");
-            else if (currentUser.role === 'caretaker') navigate("/caretaker");
-            else navigate("/home");
-
-            // Guardar o limpiar credenciales
-            if (rememberMe) {
-                localStorage.setItem("glucobot_saved_credentials", JSON.stringify({ rut, password, remember: true }));
-            } else {
-                localStorage.removeItem("glucobot_saved_credentials");
-            }
-        } else {
-            setError("Credenciales incorrectas");
+        if (!user) {
+            toast("Correo o contraseña incorrectos", "error");
+            setIsLoading(false);
+            return;
         }
+
+        // Save current user
+        localStorage.setItem("glucobot_current_user", JSON.stringify(user));
+
+        toast(`¡Bienvenido, ${user.name}!`, "success");
+
+        // Redirect based on role
+        setTimeout(() => {
+            if (user.role === "patient") {
+                navigate("/home");
+            } else if (user.role === "caretaker") {
+                navigate("/caretaker");
+            } else {
+                navigate("/home");
+            }
+        }, 500);
     };
 
     return (
-        <div style={{
-            minHeight: "100vh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#F0F4FF",
-            padding: "20px",
-            position: "relative",
-            overflow: "hidden"
-        }}>
-            {/* 🔵 Shapes Animados (Background) */}
-            <NeuralBackground opacity={0.5} />
+        <div style={container}>
+            <div style={card}>
+                <h1 style={title}>Iniciar Sesión</h1>
+                <p style={subtitle}>Bienvenido de vuelta a Glucobot</p>
 
-            <div style={{
-                background: "white",
-                padding: "40px",
-                borderRadius: "24px",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
-                width: "100%",
-                maxWidth: "400px",
-                textAlign: "center",
-                position: "relative",
-                zIndex: 10
-            }}>
-                <img
-                    src="/logo.png"
-                    alt="Leucode.IA"
-                    style={{
-                        height: "80px",
-                        marginBottom: "16px",
-                        objectFit: "contain"
-                    }}
-                />
-                <h1 style={{ marginBottom: "8px", color: "#1F2937" }}>Bienvenido</h1>
-                <p style={{ color: "#6B7280", marginBottom: "20px" }}>Ingresa a tu cuenta SanniBot.IA</p>
+                <div style={fieldGroup}>
+                    <label style={label}>Correo Electrónico</label>
+                    <input
+                        style={input}
+                        name="email"
+                        type="email"
+                        placeholder="correo@ejemplo.com"
+                        value={form.email}
+                        onChange={handleChange}
+                    />
+                </div>
 
-                {/* BOTÓN GOOGLE */}
+                <div style={fieldGroup}>
+                    <label style={label}>Contraseña</label>
+                    <input
+                        style={input}
+                        name="password"
+                        type="password"
+                        placeholder="••••••"
+                        value={form.password}
+                        onChange={handleChange}
+                    />
+                </div>
+
                 <button
-                    onClick={async () => {
-                        // Login logic
-                        const user = await loginWithGoogle();
-                        if (user) {
-                            if (!user.profileCompleted && user.role === 'patient') {
-                                navigate("/onboarding");
-                                return;
-                            }
-
-                            if (user.role === 'admin') navigate("/admin");
-                            else if (user.role === 'caretaker') navigate("/caretaker");
-                            else navigate("/home");
-                        }
-                    }}
-                    style={{
-                        width: "100%",
-                        padding: "12px",
-                        marginBottom: "20px",
-                        borderRadius: "12px",
-                        border: "1px solid #E5E7EB",
-                        background: "white",
-                        color: "#374151",
-                        fontSize: "15px",
-                        fontWeight: "500",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "10px",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-                    }}
+                    style={{ ...btn, opacity: isLoading ? 0.7 : 1 }}
+                    onClick={handleLogin}
+                    disabled={isLoading}
                 >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google" />
-                    Continuar con Google
+                    {isLoading ? "Entrando..." : "Entrar"}
                 </button>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#9CA3AF" }}>
-                    <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
-                    <span style={{ fontSize: "14px" }}>o ingresa con</span>
-                    <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
-                </div>
-
-                {/* SELECTOR DE ROL */}
-                <div style={{ display: "flex", background: "#F3F4F6", padding: "4px", borderRadius: "12px", marginBottom: "20px" }}>
-                    <button
-                        onClick={() => setRole("patient")}
-                        style={{
-                            flex: 1,
-                            padding: "10px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: role === "patient" ? "white" : "transparent",
-                            color: role === "patient" ? "#1F4FFF" : "#6B7280",
-                            fontWeight: "bold",
-                            boxShadow: role === "patient" ? "0 2px 5px rgba(0,0,0,0.05)" : "none",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                        }}
-                    >
-                        Soy Paciente
-                    </button>
-                    <button
-                        onClick={() => setRole("caretaker")}
-                        style={{
-                            flex: 1,
-                            padding: "10px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: role === "caretaker" ? "white" : "transparent",
-                            color: role === "caretaker" ? "#1F4FFF" : "#6B7280",
-                            fontWeight: "bold",
-                            boxShadow: role === "caretaker" ? "0 2px 5px rgba(0,0,0,0.05)" : "none",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                        }}
-                    >
-                        Soy Cuidador
+                <div style={{ textAlign: "center", marginTop: "20px" }}>
+                    <button onClick={() => navigate("/register")} style={linkBtn}>
+                        ¿No tienes cuenta? <span style={{ color: "#2563EB" }}>Regístrate</span>
                     </button>
                 </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <input
-                        type="text"
-                        placeholder="RUT o Email"
-                        value={rut}
-                        onChange={(e) => setRut(e.target.value)}
-                        style={{
-                            padding: "15px",
-                            borderRadius: "12px",
-                            border: "1px solid #E5E7EB",
-                            fontSize: "16px"
-                        }}
-                    />
-
-                    <input
-                        type="password"
-                        placeholder="Contraseña"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                            padding: "15px",
-                            borderRadius: "12px",
-                            border: "1px solid #E5E7EB",
-                            fontSize: "16px"
-                        }}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-start" }}>
-                        <input
-                            type="checkbox"
-                            id="rememberMe"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            style={{
-                                width: "18px",
-                                height: "18px",
-                                cursor: "pointer",
-                                accentColor: "#1F4FFF"
-                            }}
-                        />
-                        <label htmlFor="rememberMe" style={{ color: "#6B7280", fontSize: "14px", cursor: "pointer", userSelect: "none" }}>
-                            Recordar contraseña
-                        </label>
-                    </div>
-                    <button
-                        onClick={handleLogin}
-                        disabled={loading}
-                        style={{
-                            padding: "15px",
-                            borderRadius: "12px",
-                            background: "#1F4FFF",
-                            color: "white",
-                            fontSize: "16px",
-                            fontWeight: "bold",
-                            border: "none",
-                            cursor: loading ? "wait" : "pointer",
-                            opacity: loading ? 0.7 : 1
-                        }}
-                    >
-                        {loading ? "Ingresando..." : "Ingresar"}
-                    </button>
-
-                    <div style={{ marginTop: "10px", borderTop: "1px solid #f0f0f0", paddingTop: "20px" }}>
-                        <p style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>¿No tienes cuenta?</p>
-                        <button
-                            style={{
-                                padding: "12px",
-                                background: "white",
-                                color: "#1F4FFF",
-                                border: "1px solid #1F4FFF",
-                                borderRadius: "12px",
-                                fontWeight: "bold",
-                                cursor: "pointer",
-                                width: "100%"
-                            }}
-                            onClick={() => navigate("/register")}
-                        >
-                            Crear nueva cuenta
-                        </button>
-                    </div>
-                </div>
-
-                {error && <p style={{ color: "red", marginTop: "20px" }}>{error}</p>}
             </div>
-
-            <div style={{
-                marginTop: "24px",
-                color: "#6B7280",
-                fontSize: "12px",
-                fontWeight: "500",
-                letterSpacing: "0.5px"
-            }}>
-                BY LEUCODE.IA ®
-            </div>
-            {/* Z-Index fix for footer */}
-            <div style={{
-                position: "relative",
-                zIndex: 10
-            }}></div>
         </div>
     );
 }
+
+// Styles
+const container: React.CSSProperties = {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    padding: "20px"
+};
+
+const card: React.CSSProperties = {
+    background: "white",
+    padding: "40px",
+    borderRadius: "20px",
+    width: "100%",
+    maxWidth: "400px",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+};
+
+const title: React.CSSProperties = {
+    fontSize: "28px",
+    fontWeight: "800",
+    color: "#1F2937",
+    margin: "0 0 5px",
+    textAlign: "center"
+};
+
+const subtitle: React.CSSProperties = {
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: "30px"
+};
+
+const fieldGroup: React.CSSProperties = {
+    marginBottom: "16px"
+};
+
+const label: React.CSSProperties = {
+    display: "block",
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: "6px"
+};
+
+const input: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: "10px",
+    border: "1px solid #D1D5DB",
+    fontSize: "16px",
+    backgroundColor: "#F9FAFB",
+    boxSizing: "border-box"
+};
+
+const btn: React.CSSProperties = {
+    width: "100%",
+    padding: "14px",
+    borderRadius: "12px",
+    backgroundColor: "#7C3AED",
+    color: "white",
+    border: "none",
+    fontSize: "16px",
+    fontWeight: "700",
+    cursor: "pointer",
+    marginTop: "10px"
+};
+
+const linkBtn: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    color: "#6B7280",
+    cursor: "pointer",
+    fontSize: "14px"
+};

@@ -10,6 +10,9 @@ import Welcome from "../pages/Welcome";
 import Register from "../pages/Register";
 import RegisterComplete from "../pages/RegisterComplete";
 import Onboarding from "../pages/Onboarding";
+import WelcomeCall from "../pages/WelcomeCall";
+import Maintenance from "../pages/Maintenance";
+import TestCalls from "../pages/TestCalls";
 
 /* Paciente */
 import Home from "../pages/Home";
@@ -62,6 +65,9 @@ export default function AppRouter() {
         <Route path="/register-complete" element={<RegisterComplete />} />
         {/* Onboarding for Google Users */}
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/welcome-call" element={<WelcomeCall />} />
+        <Route path="/maintenance" element={<Maintenance />} />
+        <Route path="/test-calls" element={<TestCalls />} />
 
         {/* PÁGINAS CON LAYOUT */}
         {/* PÁGINAS CON LAYOUT (PROTEGIDAS) */}

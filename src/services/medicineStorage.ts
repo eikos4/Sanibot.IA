@@ -1,82 +1,75 @@
-import { db, auth } from "../firebase/config";
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query,
-  where,
-  getDocs
-} from "firebase/firestore";
+// Medicine Storage - Local Version (Works offline)
 
 export interface Medicine {
-  id: string; // Changed from number to string for Firestore IDs
+  id: string;
   nombre: string;
   dosis: string;
   horarios: string[];
   duration?: 'chronic' | 'temporary';
   endDate?: string;
-  userId: string; // New field to link to user
+  userId?: string;
 }
 
-const COLLECTION = "medicines";
+const STORAGE_KEY = "glucobot_medicines";
 
-// Realtime subscription
-export const subscribeToMedicines = (callback: (meds: Medicine[]) => void, targetUserId?: string) => {
-  const user = auth.currentUser;
-  const uid = targetUserId || user?.uid;
-
-  if (!uid) {
-    callback([]);
-    return () => { };
+// Get all medicines from localStorage
+export const getMedicines = (): Medicine[] => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
   }
-
-  const q = query(collection(db, COLLECTION), where("userId", "==", uid));
-
-  return onSnapshot(q, (snapshot) => {
-    const meds = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id
-    })) as Medicine[];
-    callback(meds);
-  });
 };
 
+// Save medicines to localStorage
+const saveMedicines = (meds: Medicine[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(meds));
+  // Dispatch event for subscribers
+  window.dispatchEvent(new CustomEvent("medicines-updated", { detail: meds }));
+};
+
+// Subscribe to changes (simulates onSnapshot)
+export const subscribeToMedicines = (callback: (meds: Medicine[]) => void) => {
+  // Initial load
+  callback(getMedicines());
+
+  // Listen for changes
+  const handler = (e: Event) => {
+    const customEvent = e as CustomEvent<Medicine[]>;
+    callback(customEvent.detail);
+  };
+
+  window.addEventListener("medicines-updated", handler);
+
+  // Return unsubscribe function
+  return () => window.removeEventListener("medicines-updated", handler);
+};
+
+// Add a new medicine
 export const addMedicine = async (medicine: Omit<Medicine, "id" | "userId">) => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("User not authenticated");
-
-  await addDoc(collection(db, COLLECTION), {
+  const meds = getMedicines();
+  const newMed: Medicine = {
     ...medicine,
-    userId: user.uid,
-    createdAt: new Date()
-  });
+    id: Date.now().toString(),
+    userId: "local"
+  };
+  meds.push(newMed);
+  saveMedicines(meds);
 };
 
+// Update a medicine
 export const updateMedicine = async (id: string, updated: Partial<Medicine>) => {
-  const docRef = doc(db, COLLECTION, id);
-  await updateDoc(docRef, updated);
+  const meds = getMedicines();
+  const index = meds.findIndex(m => m.id === id);
+  if (index !== -1) {
+    meds[index] = { ...meds[index], ...updated };
+    saveMedicines(meds);
+  }
 };
 
+// Delete a medicine
 export const deleteMedicine = async (id: string) => {
-  if (!id) return; // Prevent deleting undefined
-  const docRef = doc(db, COLLECTION, id);
-  await deleteDoc(docRef);
+  const meds = getMedicines().filter(m => m.id !== id);
+  saveMedicines(meds);
 };
-
-// Legacy support / One-time fetch if needed
-// But we should prefer subscription
-export const getMedicines = async (): Promise<Medicine[]> => {
-  const user = auth.currentUser;
-  if (!user) return [];
-
-  const q = query(collection(db, COLLECTION), where("userId", "==", user.uid));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc: any) => ({
-    ...doc.data(),
-    id: doc.id
-  })) as Medicine[];
-};
-

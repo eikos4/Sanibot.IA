@@ -1,374 +1,262 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // Import useAuth
-import { savePatientData } from "../services/patientStorage";
-import { register } from "../services/authService";
-import type { User } from "../services/authService";
-import { validateRut, formatRut, cleanRut } from "../utils/validators";
+import { useToast } from "../components/ui/Toast";
+
+// Simple local user storage
+const LOCAL_USERS_KEY = "glucobot_users";
+
+interface LocalUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: "patient" | "caretaker";
+}
+
+const getLocalUsers = (): LocalUser[] => {
+  const data = localStorage.getItem(LOCAL_USERS_KEY);
+  return data ? JSON.parse(data) : [];
+};
+
+const saveLocalUser = (user: LocalUser): boolean => {
+  const users = getLocalUsers();
+  if (users.find(u => u.email === user.email)) {
+    return false; // Already exists
+  }
+  users.push(user);
+  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+  return true;
+};
 
 export default function Register() {
   const navigate = useNavigate();
-  const { loginWithGoogle } = useAuth(); // Destructure loginWithGoogle
+  const { toast } = useToast();
 
   const [form, setForm] = useState({
-    nombre: "",
-    rut: "", // RUT o Email
-    edad: "",
-    password: "", // Pass Paciente
+    name: "",
+    email: "",
+    password: "",
     confirmPassword: "",
-    rol: "patient",
-    estadoCivil: "",
-    direccion: "",
-    telefono: "",
-    tipoDiabetes: "",
-    tipoSangre: "",
-    // Datos Cuidador / Emergencia
-    emergenciaNombre: "",
-    emergenciaRut: "", // RUT Cuidador
-    emergenciaPassword: "", // Pass Cuidador
-    emergenciaTelefono: "",
-    emergenciaRelacion: "",
+    role: "patient" as "patient" | "caretaker"
   });
 
-  const [hasCaretaker, setHasCaretaker] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    let { name, value } = e.target;
-
-    // Formateo automático de RUT solo si NO incluye @ y parece RUT
-    if ((name === "rut" || name === "emergenciaRut") && !value.includes("@")) {
-      // Simple check to avoid formatting emails
-      const clean = value.replace(/[^0-9kK]/g, '');
-      if (clean.length > 1) {
-        value = formatRut(value);
-      }
-    }
-
-    setForm({ ...form, [name]: value });
-    // Limpiar error al escribir
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: "" });
-    }
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    // 1. Paciente
-    if (!form.nombre.trim()) newErrors.nombre = "El nombre es obligatorio.";
-
-    // Validate Rut OR Email
-    if (!form.rut) {
-      newErrors.rut = "RUT o Email es obligatorio.";
-    } else if (form.rut.includes("@")) {
-      // Basic email validation
-      if (!/\S+@\S+\.\S+/.test(form.rut)) newErrors.rut = "Email inválido.";
-    } else {
-      // Validate as RUT
-      if (!validateRut(form.rut)) newErrors.rut = "RUT inválido.";
+  const handleRegister = () => {
+    // Validation
+    if (!form.name.trim()) {
+      toast("El nombre es obligatorio", "error");
+      return;
     }
-
-    if (!form.password) newErrors.password = "La contraseña es obligatoria.";
-    else if (form.password.length < 6) newErrors.password = "Mínimo 6 caracteres.";
-
+    if (!form.email.trim()) {
+      toast("El correo es obligatorio", "error");
+      return;
+    }
+    if (form.password.length < 4) {
+      toast("La contraseña debe tener al menos 4 caracteres", "error");
+      return;
+    }
     if (form.password !== form.confirmPassword) {
-      newErrors.confirmPassword = "Las contraseñas no coinciden.";
-    }
-
-    // Datos opcionales importantes
-    if (form.telefono && form.telefono.length < 8) newErrors.telefono = "Formato inválido.";
-    if (!form.edad) newErrors.edad = "Requerido.";
-
-    // 2. Cuidador (Si corresponde)
-    if (form.rol === "patient" && hasCaretaker) {
-      if (!form.emergenciaNombre.trim()) newErrors.emergenciaNombre = "Nombre del cuidador requerido.";
-
-      if (!form.emergenciaRut) newErrors.emergenciaRut = "RUT del cuidador requerido.";
-      else if (!validateRut(form.emergenciaRut)) newErrors.emergenciaRut = "RUT de cuidador inválido.";
-
-      if (!form.emergenciaPassword) newErrors.emergenciaPassword = "Contraseña requerida.";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleRegister = async () => {
-    if (!validateForm()) return;
-
-    // 3. Registrar Paciente
-    const newPatient: User = {
-      id: "", // Will be set by Firebase
-      username: form.rut.includes("@") ? form.rut : cleanRut(form.rut),
-      name: form.nombre,
-      // @ts-ignore
-      role: form.rol
-    };
-
-    const patientRegistered = await register(newPatient, form.password);
-    if (!patientRegistered) {
-      alert("El RUT/Email ya está registrado o hubo un error.");
+      toast("Las contraseñas no coinciden", "error");
       return;
     }
 
-    // 4. Registrar Cuidador (automáticamente)
-    if (form.rol === "patient" && hasCaretaker) {
-      const newCaretaker: User = {
-        id: "",
-        username: cleanRut(form.emergenciaRut),
-        name: form.emergenciaNombre,
-        role: "caretaker"
-      };
+    setIsLoading(true);
 
-      const caretakerRegistered = await register(newCaretaker, form.emergenciaPassword);
-      if (!caretakerRegistered) {
-        alert("Advertencia: El paciente se creó, pero el RUT del cuidador ya existía. Verifica los datos.");
-      } else {
-        await savePatientData(form);
-      }
-    } else {
-      await savePatientData(form);
+    // Create user
+    const newUser: LocalUser = {
+      id: Date.now().toString(),
+      name: form.name,
+      email: form.email.toLowerCase(),
+      password: form.password,
+      role: form.role
+    };
+
+    const success = saveLocalUser(newUser);
+
+    if (!success) {
+      toast("Este correo ya está registrado", "error");
+      setIsLoading(false);
+      return;
     }
 
-    navigate("/register-complete");
+    // Auto-login
+    localStorage.setItem("glucobot_current_user", JSON.stringify(newUser));
+
+    toast("¡Cuenta creada con éxito!", "success");
+
+    // Redirect
+    setTimeout(() => {
+      if (form.role === "patient") {
+        navigate("/welcome-call");
+      } else {
+        navigate("/caretaker");
+      }
+    }, 500);
   };
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "450px",
-        margin: "0 auto",
-        padding: "20px",
-        paddingBottom: "80px"
-      }}
-    >
-      <h2 style={{ fontSize: "28px", textAlign: "center", marginBottom: "5px" }}>
-        Crear Cuenta
-      </h2>
+    <div style={container}>
+      <div style={card}>
+        <h1 style={title}>Crear Cuenta</h1>
+        <p style={subtitle}>Registro rápido para Glucobot</p>
 
-      <p style={{ color: "#666", textAlign: "center", marginBottom: "25px", fontSize: "15px" }}>
-        Completa tu información y asigna a tu cuidador.
-      </p>
+        <div style={fieldGroup}>
+          <label style={label}>Tipo de Usuario</label>
+          <select style={input} name="role" value={form.role} onChange={handleChange}>
+            <option value="patient">Paciente</option>
+            <option value="caretaker">Cuidador</option>
+          </select>
+        </div>
 
-      {/* BOTÓN GOOGLE */}
-      <button
-        onClick={async () => {
-          const user = await loginWithGoogle();
-          if (user) {
-            if (!user.profileCompleted && user.role === 'patient') {
-              navigate("/onboarding");
-              return;
-            }
-            if (user.role === 'admin') navigate("/admin");
-            else if (user.role === 'caretaker') navigate("/caretaker");
-            else navigate("/home");
-          }
-        }}
-        style={{
-          width: "100%",
-          padding: "12px",
-          marginBottom: "20px",
-          borderRadius: "12px",
-          border: "1px solid #E5E7EB",
-          background: "white",
-          color: "#374151",
-          fontSize: "15px",
-          fontWeight: "500",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "10px",
-          cursor: "pointer",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-        }}
-      >
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google" />
-        Continuar con Google
-      </button>
+        <div style={fieldGroup}>
+          <label style={label}>Nombre Completo</label>
+          <input
+            style={input}
+            name="name"
+            placeholder="Juan Pérez"
+            value={form.name}
+            onChange={handleChange}
+          />
+        </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#9CA3AF" }}>
-        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
-        <span style={{ fontSize: "14px" }}>o crea tu cuenta</span>
-        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }}></div>
-      </div>
+        <div style={fieldGroup}>
+          <label style={label}>Correo Electrónico</label>
+          <input
+            style={input}
+            name="email"
+            type="email"
+            placeholder="correo@ejemplo.com"
+            value={form.email}
+            onChange={handleChange}
+          />
+        </div>
 
-
-      {/* CREDENCIALES PACIENTE */}
-      <h3 style={sectionTitle}>👤 Tus Datos de Ingreso</h3>
-
-      <div style={{ marginBottom: "15px" }}>
-        <p style={{ fontSize: "14px", color: "#666", marginBottom: "5px" }}>Te estás registrando como:</p>
-        <select style={input} name="rol" onChange={handleChange} value={form.rol}>
-          <option value="patient">Paciente (con Cuidador)</option>
-          <option value="caretaker">Cuidador (Independiente)</option>
-        </select>
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <input style={input} name="rut" placeholder="Tu RUT o Email" onChange={handleChange} value={form.rut} maxLength={50} />
-        {errors.rut && <span style={errorText}>{errors.rut}</span>}
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <input style={input} type="password" name="password" placeholder="Tu Contraseña" onChange={handleChange} />
-        {errors.password && <span style={errorText}>{errors.password}</span>}
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <input style={input} type="password" name="confirmPassword" placeholder="Confirmar Tu Contraseña" onChange={handleChange} />
-        {errors.confirmPassword && <span style={errorText}>{errors.confirmPassword}</span>}
-      </div>
-
-      <div style={{ marginBottom: "10px" }}>
-        <input style={input} name="nombre" placeholder="Tu Nombre completo" onChange={handleChange} />
-        {errors.nombre && <span style={errorText}>{errors.nombre}</span>}
-      </div>
-
-
-      {form.rol === "patient" && (
-        <>
-          {/* DATOS PERSONALES */}
-          <h3 style={sectionTitle}>📋 Tus Datos Personales</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <div>
-              <input style={{ ...input, marginTop: "0" }} name="edad" placeholder="Edad" type="number" onChange={handleChange} />
-              {errors.edad && <span style={errorText}>{errors.edad}</span>}
-            </div>
-
-            <select style={{ ...input, marginTop: "0" }} name="estadoCivil" onChange={handleChange}>
-              <option value="">Estado civil</option>
-              <option value="Soltero(a)">Soltero(a)</option>
-              <option value="Casado(a)">Casado(a)</option>
-              <option value="Divorciado(a)">Divorciado(a)</option>
-              <option value="Viudo(a)">Viudo(a)</option>
-            </select>
+        <div style={row}>
+          <div style={{ flex: 1 }}>
+            <label style={label}>Contraseña</label>
+            <input
+              style={input}
+              name="password"
+              type="password"
+              placeholder="••••••"
+              value={form.password}
+              onChange={handleChange}
+            />
           </div>
-          <input style={input} name="direccion" placeholder="Dirección" onChange={handleChange} />
-
-          <div style={{ marginBottom: "10px" }}>
-            <input style={input} name="telefono" placeholder="Teléfono" onChange={handleChange} />
-            {errors.telefono && <span style={errorText}>{errors.telefono}</span>}
+          <div style={{ flex: 1 }}>
+            <label style={label}>Confirmar</label>
+            <input
+              style={input}
+              name="confirmPassword"
+              type="password"
+              placeholder="••••••"
+              value={form.confirmPassword}
+              onChange={handleChange}
+            />
           </div>
+        </div>
 
-          {/* DATOS CLÍNICOS */}
-          <h3 style={sectionTitle}>🩸 Datos Clínicos</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <select style={{ ...input, marginTop: "0" }} name="tipoDiabetes" onChange={handleChange}>
-              <option value="">Diabetes...</option>
-              <option value="Tipo 1">Tipo 1</option>
-              <option value="Tipo 2">Tipo 2</option>
-              <option value="Gestacional">Gestacional</option>
-            </select>
-            <select style={{ ...input, marginTop: "0" }} name="tipoSangre" onChange={handleChange}>
-              <option value="">Sangre...</option>
-              <option value="O+">O+</option>
-              <option value="O-">O-</option>
-              <option value="A+">A+</option>
-              <option value="AB+">AB+</option>
-            </select>
-          </div>
-
-          {/* DATOS CUIDADOR (OPCIONAL) */}
-          <div style={{ marginTop: "30px", marginBottom: "20px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "16px", fontWeight: "bold", color: "#1F4FFF" }}>
-              <input
-                type="checkbox"
-                checked={hasCaretaker}
-                onChange={(e) => setHasCaretaker(e.target.checked)}
-                style={{ width: "20px", height: "20px" }}
-              />
-              Quiero asignar un Cuidador ahora
-            </label>
-            <p style={{ fontSize: "13px", color: "#666", marginTop: "5px", marginLeft: "30px" }}>
-              Activa esta opción si tienes un familiar o enfermera que te ayudará a monitorear tu salud.
-            </p>
-          </div>
-
-          {hasCaretaker && (
-            <div style={{ padding: "20px", background: "#EFF6FF", borderRadius: "16px", border: "1px dashed #1F4FFF" }}>
-              <h3 style={{ ...sectionTitle, marginTop: 0, color: "#1F4FFF" }}>🛡️ Datos de tu Cuidador</h3>
-              <p style={{ fontSize: "13px", color: "#555", marginBottom: "15px" }}>
-                Crearemos una cuenta para él/ella automáticamente.
-              </p>
-
-              <div style={{ marginBottom: "10px" }}>
-                <input style={input} name="emergenciaNombre" placeholder="Nombre Del Cuidador" onChange={handleChange} />
-                {errors.emergenciaNombre && <span style={errorText}>{errors.emergenciaNombre}</span>}
-              </div>
-
-              <input style={input} name="emergenciaRelacion" placeholder="Relación (Ej: Hijo, Enfermera)" onChange={handleChange} />
-              <input style={input} name="emergenciaTelefono" placeholder="Teléfono del Cuidador" onChange={handleChange} />
-
-              <div style={{ height: "1px", background: "#D3DAEB", margin: "15px 0" }}></div>
-
-              <p style={{ fontSize: "13px", fontWeight: "bold", color: "#1F4FFF", marginBottom: "5px" }}>Credenciales para el Cuidador:</p>
-
-              <div style={{ marginBottom: "10px" }}>
-                <input style={input} name="emergenciaRut" placeholder="RUT del Cuidador (Usuario)" onChange={handleChange} value={form.emergenciaRut} maxLength={12} />
-                {errors.emergenciaRut && <span style={errorText}>{errors.emergenciaRut}</span>}
-              </div>
-
-              <div style={{ marginBottom: "10px" }}>
-                <input style={input} type="password" name="emergenciaPassword" placeholder="Crear Contraseña para Cuidador" onChange={handleChange} />
-                {errors.emergenciaPassword && <span style={errorText}>{errors.emergenciaPassword}</span>}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      <button style={btn} onClick={handleRegister}>
-        Registrar
-      </button>
-
-      <div style={{ textAlign: "center", marginTop: "20px" }}>
         <button
-          onClick={() => navigate("/login")}
-          style={{ background: "none", border: "none", color: "#1F4FFF", fontWeight: "bold", cursor: "pointer", fontSize: "15px" }}
+          style={{ ...btn, opacity: isLoading ? 0.7 : 1 }}
+          onClick={handleRegister}
+          disabled={isLoading}
         >
-          ← Volver al login
+          {isLoading ? "Creando..." : "Crear Cuenta"}
         </button>
+
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <button onClick={() => navigate("/login")} style={linkBtn}>
+            ¿Ya tienes cuenta? <span style={{ color: "#2563EB" }}>Inicia sesión</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-const input: React.CSSProperties = {
-  width: "100%",
-  padding: "13px",
-  borderRadius: "10px",
-  border: "1px solid #D3D3D3",
-  marginTop: "10px",
-  fontSize: "16px",
+// Styles
+const container: React.CSSProperties = {
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  padding: "20px"
 };
 
-const sectionTitle: React.CSSProperties = {
-  textAlign: "left",
-  marginTop: "20px",
-  marginBottom: "8px",
-  color: "#333",
-  fontSize: "19px",
-  fontWeight: 600,
+const card: React.CSSProperties = {
+  background: "white",
+  padding: "40px",
+  borderRadius: "20px",
+  width: "100%",
+  maxWidth: "400px",
+  boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+};
+
+const title: React.CSSProperties = {
+  fontSize: "28px",
+  fontWeight: "800",
+  color: "#1F2937",
+  margin: "0 0 5px",
+  textAlign: "center"
+};
+
+const subtitle: React.CSSProperties = {
+  color: "#6B7280",
+  textAlign: "center",
+  marginBottom: "30px"
+};
+
+const fieldGroup: React.CSSProperties = {
+  marginBottom: "16px"
+};
+
+const label: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#374151",
+  marginBottom: "6px"
+};
+
+const input: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 16px",
+  borderRadius: "10px",
+  border: "1px solid #D1D5DB",
+  fontSize: "16px",
+  backgroundColor: "#F9FAFB",
+  boxSizing: "border-box"
+};
+
+const row: React.CSSProperties = {
+  display: "flex",
+  gap: "12px",
+  marginBottom: "16px"
 };
 
 const btn: React.CSSProperties = {
   width: "100%",
-  padding: "17px",
+  padding: "14px",
   borderRadius: "12px",
-  backgroundColor: "#1F4FFF",
+  backgroundColor: "#7C3AED",
   color: "white",
   border: "none",
-  marginTop: "30px",
-  fontSize: "18px",
+  fontSize: "16px",
+  fontWeight: "700",
   cursor: "pointer",
+  marginTop: "10px"
 };
 
-const errorText: React.CSSProperties = {
-  color: "#EF4444",
-  fontSize: "12px",
-  marginLeft: "5px",
-  marginTop: "2px",
-  display: "block"
+const linkBtn: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "#6B7280",
+  cursor: "pointer",
+  fontSize: "14px"
 };
