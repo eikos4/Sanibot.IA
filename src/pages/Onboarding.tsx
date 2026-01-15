@@ -14,7 +14,7 @@ export default function Onboarding() {
     // Initial State consistent with PatientData
     const [form, setForm] = useState<Partial<PatientData>>({
         // Step 1: Identificación
-        rut: user?.username || "",
+        rut: user?.email?.split("@")[0] || "",
         fechaNacimiento: "",
         genero: "",
         prevision: "",
