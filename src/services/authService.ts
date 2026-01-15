@@ -14,6 +14,7 @@ import { auth, db } from "../firebase/config";
 export interface User {
     id: string;
     username: string; // Email en Firebase (o RUT convertido)
+    email?: string;
     name: string;
     role: "patient" | "caretaker" | "admin";
     profileCompleted?: boolean;

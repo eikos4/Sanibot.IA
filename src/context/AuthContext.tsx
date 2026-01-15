@@ -1,49 +1,46 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-
-// Simple local user type
-interface LocalUser {
-    id: string;
-    name: string;
-    email: string;
-    role: "patient" | "caretaker" | "admin";
-}
+import { subscribeToAuthChanges, logout as serviceLogout } from "../services/authService";
+import type { User } from "../services/authService";
 
 interface AuthContextType {
-    user: LocalUser | null;
+    user: User | null;
     isLoading: boolean;
     logout: () => void;
-    refreshUser: () => void;
+    refreshUser: () => void; // Kept for interface compatibility but might be less needed with realtime auth
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<LocalUser | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const refreshUser = () => {
-        const savedUser = localStorage.getItem("glucobot_current_user");
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
-        } else {
-            setUser(null);
-        }
-        setIsLoading(false);
-    };
-
     useEffect(() => {
-        // Check localStorage for current user on mount
-        refreshUser();
+        // Subscribe to Firebase Auth changes
+        const unsubscribe = subscribeToAuthChanges((currentUser) => {
+            setUser(currentUser);
+            setIsLoading(false);
 
-        // Listen for storage changes (for multi-tab support)
-        const handleStorage = () => refreshUser();
-        window.addEventListener("storage", handleStorage);
-        return () => window.removeEventListener("storage", handleStorage);
+            // Sync local storage for non-auth-context needs (redundancy)
+            if (currentUser) {
+                localStorage.setItem("glucobot_current_user", JSON.stringify(currentUser));
+            } else {
+                localStorage.removeItem("glucobot_current_user");
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const logout = () => {
-        localStorage.removeItem("glucobot_current_user");
+        serviceLogout();
         setUser(null);
+        localStorage.removeItem("glucobot_current_user");
+    };
+
+    const refreshUser = () => {
+        // With Firebase listener, manual refresh is rarely needed unless we want to re-fetch profile doc explicitly
+        // For now, we rely on the listener update or we could implement re-fetch logic in authService
     };
 
     return (

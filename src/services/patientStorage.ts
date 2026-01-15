@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 
 // Standards per MINSAL Chile
@@ -41,40 +41,57 @@ export interface PatientData {
   profileCompleted: true;
 }
 
+const LOCAL_KEY = "glucobot_patient_data";
+
+// Helper for timeout
+const timeoutPromise = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
+
 // Save (Merge) patient data into the user's document
 export const savePatientData = async (data: Partial<PatientData>) => {
   const user = auth.currentUser;
+
+  // Also save to localStorage always
+  const existingLocal = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}");
+  const mergedLocal = { ...existingLocal, ...data, profileCompleted: true };
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(mergedLocal));
+
   if (!user) return;
 
   try {
     const userRef = doc(db, "users", user.uid);
-    // Merge data into the existing user document
-    await updateDoc(userRef, {
-      ...data,
-      profileCompleted: true // Flag to mark profile as complete
-    });
+    // Race between Firestore and 3s timeout
+    await Promise.race([
+      setDoc(userRef, data, { merge: true }),
+      timeoutPromise(3000)
+    ]);
   } catch (error) {
-    console.error("Error saving patient data:", error);
+    console.warn("Error saving patient data to Firestore (saved locally):", error);
   }
 };
 
-export const getPatientData = async () => {
+export const getPatientData = async (): Promise<Partial<PatientData> | null> => {
+  const local = localStorage.getItem(LOCAL_KEY);
+  const localData = local ? JSON.parse(local) : null;
+
   const user = auth.currentUser;
-  if (!user) return null;
+  if (!user) return localData;
 
   try {
     const userRef = doc(db, "users", user.uid);
     const snapshot = await getDoc(userRef);
     if (snapshot.exists()) {
-      return snapshot.data();
+      const cloudData = snapshot.data() as PatientData;
+      // Update local storage with fresh data
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
+      return cloudData;
     }
   } catch (error) {
-    console.error("Error getting patient data:", error);
+    console.error("Error getting patient data from cloud, using local:", error);
   }
-  return null;
+
+  return localData;
 };
 
 export const clearPatientData = () => {
-  // No-op for cloud, maybe sign out?
-  // localStorage.removeItem("glucobot_patient");
+  localStorage.removeItem(LOCAL_KEY);
 };

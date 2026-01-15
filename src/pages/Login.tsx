@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/Toast";
 import NeuralBackground from "../components/NeuralBackground";
-import { useAuth } from "../context/AuthContext";
+import { login, loginWithGoogle } from "../services/authService";
 
 export default function Login() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const { refreshUser } = useAuth();
+    // const { refreshUser } = useAuth(); // Not used directly here anymore // AuthContext should also be listening to firebase
 
     const [form, setForm] = useState({
         email: "",
@@ -33,32 +33,15 @@ export default function Login() {
 
         setIsLoading(true);
 
-        // Simulate network delay for effect
-        await new Promise(r => setTimeout(r, 800));
-
         try {
-            // 1. Try Local Search first (since we just built this local system)
-            const usersStr = localStorage.getItem("glucobot_users");
-            const users = usersStr ? JSON.parse(usersStr) : [];
-
-            const user = users.find(
-                (u: any) => u.email.toLowerCase() === form.email.toLowerCase() && u.password === form.password
-            );
+            const user = await login(form.email, form.password);
 
             if (user) {
-                // SUCCESS LOCAL
-                localStorage.setItem("glucobot_current_user", JSON.stringify(user));
-                refreshUser(); // Update context
-
-                toast(`¡Bienvenido, ${user.name}!`, "success");
+                toast(`¡Bienvenido, ${user.name || "Usuario"}!`, "success");
                 navigate("/home");
-                return;
+            } else {
+                toast("Correo o contraseña incorrectos", "error");
             }
-
-            // If we had Firebase Auth logic here, it would go here.
-            // For now, we rely on the local system as requested by previous tasks.
-
-            toast("Correo o contraseña incorrectos", "error");
         } catch (e) {
             console.error(e);
             toast("Error al iniciar sesión", "error");
@@ -66,6 +49,24 @@ export default function Login() {
             setIsLoading(false);
         }
     };
+
+    const handleGoogleLogin = async () => {
+        setIsLoading(true);
+        try {
+            const result = await loginWithGoogle();
+            if (result.user) {
+                toast(`¡Bienvenido, ${result.user.name}!`, "success");
+                navigate("/home");
+            } else {
+                toast(result.error || "Error con Google", "error");
+            }
+        } catch (e) {
+            console.error(e);
+            toast("Error inesperado con Google", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     return (
         <div style={containerStyle}>
@@ -153,6 +154,17 @@ export default function Login() {
                     ) : (
                         "Iniciar Sesión"
                     )}
+                </button>
+
+                <button
+                    onClick={handleGoogleLogin}
+                    style={{
+                        ...googleBtnStyle,
+                        opacity: isLoading ? 0.6 : 1
+                    }}
+                    disabled={isLoading}
+                >
+                    <span style={{ marginRight: "10px", fontSize: "18px" }}>G</span> Continuar con Google
                 </button>
 
                 <div style={{ textAlign: "center", marginTop: "25px" }}>
@@ -325,6 +337,23 @@ const buttonStyle: React.CSSProperties = {
     alignItems: "center",
     justifyContent: "center"
 };
+
+const googleBtnStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "16px",
+    borderRadius: "16px",
+    background: "white",
+    color: "#374151",
+    border: "1px solid #E5E7EB",
+    fontSize: "16px",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginTop: "15px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background 0.2s"
+}
 
 const linkStyle: React.CSSProperties = {
     background: "none",

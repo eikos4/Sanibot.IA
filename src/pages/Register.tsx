@@ -2,32 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/Toast";
 import NeuralBackground from "../components/NeuralBackground";
-
-// Simple local user storage
-const LOCAL_USERS_KEY = "glucobot_users";
-
-interface LocalUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: "patient" | "caretaker";
-}
-
-const getLocalUsers = (): LocalUser[] => {
-  const data = localStorage.getItem(LOCAL_USERS_KEY);
-  return data ? JSON.parse(data) : [];
-};
-
-const saveLocalUser = (user: LocalUser): boolean => {
-  const users = getLocalUsers();
-  if (users.find(u => u.email === user.email)) {
-    return false; // Already exists
-  }
-  users.push(user);
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
-  return true;
-};
+import { register } from "../services/authService";
+import type { User } from "../services/authService";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -56,43 +32,41 @@ export default function Register() {
     // Validation
     if (!form.name.trim()) return toast("El nombre es obligatorio", "error");
     if (!form.email.trim()) return toast("El correo es obligatorio", "error");
-    if (form.password.length < 4) return toast("La contraseña debe tener al menos 4 caracteres", "error");
+    if (form.password.length < 6) return toast("La contraseña debe tener al menos 6 caracteres", "error");
     if (form.password !== form.confirmPassword) return toast("Las contraseñas no coinciden", "error");
 
     setIsLoading(true);
-    // Simular delay
-    await new Promise(r => setTimeout(r, 800));
 
-    // Create user
-    const newUser: LocalUser = {
-      id: Date.now().toString(),
+    // Prepare User object for service
+    const newUser: User = {
+      id: "", // Will be assigned by Firebase
+      username: form.email.toLowerCase(), // Using email as username for now
       name: form.name,
-      email: form.email.toLowerCase(),
-      password: form.password,
       role: form.role
     };
 
-    const success = saveLocalUser(newUser);
+    try {
+      const result = await register(newUser, form.password);
 
-    if (!success) {
-      toast("Este correo ya está registrado", "error");
-      setIsLoading(false);
-      return;
-    }
-
-    // Auto-login
-    localStorage.setItem("glucobot_current_user", JSON.stringify(newUser));
-
-    toast("¡Cuenta creada con éxito!", "success");
-
-    // Redirect
-    setTimeout(() => {
-      if (form.role === "patient") {
-        navigate("/welcome-call");
+      if (result.success) {
+        toast("¡Cuenta creada con éxito!", "success");
+        // Auto-login logic handles session via AuthContext usually, but we can redirect
+        setTimeout(() => {
+          if (form.role === "patient") {
+            navigate("/welcome-call");
+          } else {
+            navigate("/caretaker"); // Or wherever caretakers go
+          }
+        }, 1000);
       } else {
-        navigate("/caretaker");
+        toast(result.error || "Error al registrar", "error");
+        setIsLoading(false);
       }
-    }, 500);
+    } catch (e) {
+      console.error(e);
+      toast("Ocurrió un error inesperado", "error");
+      setIsLoading(false);
+    }
   };
 
   return (
