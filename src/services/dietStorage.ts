@@ -1,4 +1,17 @@
-// Diet Storage - Local Version (Works offline)
+// Diet Storage - Firestore Version with localStorage fallback
+import { db } from "../firebase/config";
+import {
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    updateDoc,
+    query,
+    orderBy,
+    where,
+    serverTimestamp
+} from "firebase/firestore";
 
 export interface MealPlan {
     id: string;
@@ -6,48 +19,69 @@ export interface MealPlan {
     time: string;
     description: string;
     enabled: boolean;
+    userId?: string;
 }
 
-const STORAGE_KEY = "glucobot_diet_plan";
+const COLLECTION = "diet_plans";
+const LOCAL_KEY = "glucobot_diet_plan";
 
-// Get all meals from localStorage
+const getCurrentUserId = (): string | null => {
+    const user = localStorage.getItem("glucobot_current_user");
+    return user ? JSON.parse(user).id : null;
+};
+
 export const getDietPlan = async (): Promise<MealPlan[]> => {
+    const uid = getCurrentUserId();
+    if (!uid) return [];
+
     try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
-    } catch {
-        return [];
+        const q = query(
+            collection(db, COLLECTION),
+            where("userId", "==", uid),
+            orderBy("time", "asc")
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as MealPlan));
+    } catch (error) {
+        console.error("Firestore getDietPlan failed, using localStorage:", error);
+        const local = localStorage.getItem(LOCAL_KEY);
+        return local ? JSON.parse(local) : [];
     }
 };
 
-// Save all meals to localStorage
-const saveMeals = (meals: MealPlan[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
-};
-
-// Add a new meal
 export const saveMeal = async (meal: Omit<MealPlan, "id">) => {
-    const meals = await getDietPlan();
-    const newMeal: MealPlan = {
-        ...meal,
-        id: Date.now().toString()
-    };
-    meals.push(newMeal);
-    saveMeals(meals);
+    const uid = getCurrentUserId();
+    if (!uid) throw new Error("User not authenticated");
+
+    try {
+        await addDoc(collection(db, COLLECTION), {
+            ...meal,
+            userId: uid,
+            createdAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Firestore saveMeal failed, saving locally:", error);
+        const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+        local.push({ ...meal, id: Date.now().toString() });
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
+    }
 };
 
-// Delete a meal
 export const deleteMeal = async (id: string) => {
-    const meals = await getDietPlan();
-    const filtered = meals.filter(m => m.id !== id);
-    saveMeals(filtered);
+    try {
+        await deleteDoc(doc(db, COLLECTION, id));
+    } catch (error) {
+        console.error("Firestore deleteMeal failed:", error);
+    }
 };
 
-// Toggle meal enabled status
 export const toggleMealStatus = async (id: string, currentStatus: boolean) => {
-    const meals = await getDietPlan();
-    const updated = meals.map(m =>
-        m.id === id ? { ...m, enabled: !currentStatus } : m
-    );
-    saveMeals(updated);
+    try {
+        await updateDoc(doc(db, COLLECTION, id), { enabled: !currentStatus });
+    } catch (error) {
+        console.error("Firestore toggleMealStatus failed:", error);
+    }
 };

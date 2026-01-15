@@ -1,4 +1,17 @@
-// Insulin Storage - Local Version (Works offline)
+// Insulin Storage - Firestore Version with localStorage fallback
+import { db } from "../firebase/config";
+import {
+    collection,
+    doc,
+    addDoc,
+    getDocs,
+    updateDoc,
+    deleteDoc,
+    query,
+    orderBy,
+    where,
+    serverTimestamp
+} from "firebase/firestore";
 
 export interface InsulinDose {
     id: string;
@@ -7,53 +20,77 @@ export interface InsulinDose {
     time: string;
     type: 'Basal' | 'Rapid' | 'Mix';
     enabled: boolean;
+    userId?: string;
 }
 
-const STORAGE_KEY = "glucobot_insulin_plan";
+const COLLECTION = "insulin_doses";
+const LOCAL_KEY = "glucobot_insulin_plan";
 
-// Get all insulin doses from localStorage
+const getCurrentUserId = (): string | null => {
+    const user = localStorage.getItem("glucobot_current_user");
+    return user ? JSON.parse(user).id : null;
+};
+
 export const getInsulinPlan = async (): Promise<InsulinDose[]> => {
+    const uid = getCurrentUserId();
+    if (!uid) return [];
+
     try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
-    } catch {
-        return [];
+        const q = query(
+            collection(db, COLLECTION),
+            where("userId", "==", uid),
+            orderBy("time", "asc")
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as InsulinDose));
+    } catch (error) {
+        console.error("Firestore getInsulinPlan failed, using localStorage:", error);
+        const local = localStorage.getItem(LOCAL_KEY);
+        return local ? JSON.parse(local) : [];
     }
 };
 
-// Save all insulin doses to localStorage
-const saveInsulinDoses = (doses: InsulinDose[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(doses));
-};
-
-// Add a new insulin dose
 export const addInsulinDose = async (dose: Omit<InsulinDose, "id">) => {
-    const doses = await getInsulinPlan();
-    const newDose: InsulinDose = {
-        ...dose,
-        id: Date.now().toString()
-    };
-    doses.push(newDose);
-    saveInsulinDoses(doses);
+    const uid = getCurrentUserId();
+    if (!uid) throw new Error("User not authenticated");
+
+    try {
+        await addDoc(collection(db, COLLECTION), {
+            ...dose,
+            userId: uid,
+            createdAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Firestore addInsulinDose failed, saving locally:", error);
+        const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+        local.push({ ...dose, id: Date.now().toString() });
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
+    }
 };
 
-// Delete an insulin dose
 export const deleteInsulinDose = async (id: string) => {
-    const doses = await getInsulinPlan();
-    const filtered = doses.filter(d => d.id !== id);
-    saveInsulinDoses(filtered);
+    try {
+        await deleteDoc(doc(db, COLLECTION, id));
+    } catch (error) {
+        console.error("Firestore deleteInsulinDose failed:", error);
+        // Fallback: remove from localStorage
+        const local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+        const filtered = local.filter((d: InsulinDose) => d.id !== id);
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(filtered));
+    }
 };
 
-// Toggle insulin dose enabled status
 export const toggleInsulinDose = async (id: string, currentStatus: boolean) => {
-    const doses = await getInsulinPlan();
-    const updated = doses.map(d =>
-        d.id === id ? { ...d, enabled: !currentStatus } : d
-    );
-    saveInsulinDoses(updated);
+    try {
+        await updateDoc(doc(db, COLLECTION, id), { enabled: !currentStatus });
+    } catch (error) {
+        console.error("Firestore toggleInsulinDose failed:", error);
+    }
 };
 
-// Compatibility export
 export const saveInsulinPlan = async () => {
     console.warn("saveInsulinPlan is deprecated");
 };
