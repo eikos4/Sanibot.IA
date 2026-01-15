@@ -1,84 +1,59 @@
-import {
-    collection,
-    doc,
-    addDoc,
-    getDocs,
-    updateDoc,
-    deleteDoc,
-    query,
-    orderBy
-} from "firebase/firestore";
-import { auth, db } from "../firebase/config";
+// Insulin Storage - Local Version (Works offline)
 
 export interface InsulinDose {
-    id: string; // Firestore Doc ID
-    description: string; // "Lantus noche", "Rápida almuerzo"
-    units: string; // "20", "15-20"
-    time: string; // HH:MM
+    id: string;
+    description: string;
+    units: string;
+    time: string;
     type: 'Basal' | 'Rapid' | 'Mix';
     enabled: boolean;
 }
 
-const getCollection = () => {
-    const user = auth.currentUser;
-    if (!user) throw new Error("User not authenticated");
-    return collection(db, "users", user.uid, "insulin_plan");
-};
+const STORAGE_KEY = "glucobot_insulin_plan";
 
+// Get all insulin doses from localStorage
 export const getInsulinPlan = async (): Promise<InsulinDose[]> => {
     try {
-        const user = auth.currentUser;
-        if (!user) return [];
-
-        const col = getCollection();
-        const q = query(col, orderBy("time", "asc")); // Order by time of day
-
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as InsulinDose));
-    } catch (e) {
-        console.error("Error fetching insulin plan", e);
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch {
         return [];
     }
 };
 
+// Save all insulin doses to localStorage
+const saveInsulinDoses = (doses: InsulinDose[]) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(doses));
+};
+
+// Add a new insulin dose
 export const addInsulinDose = async (dose: Omit<InsulinDose, "id">) => {
-    try {
-        const col = getCollection();
-        await addDoc(col, dose);
-    } catch (e) {
-        console.error("Error adding insulin dose", e);
-        throw e;
-    }
+    const doses = await getInsulinPlan();
+    const newDose: InsulinDose = {
+        ...dose,
+        id: Date.now().toString()
+    };
+    doses.push(newDose);
+    saveInsulinDoses(doses);
 };
 
+// Delete an insulin dose
 export const deleteInsulinDose = async (id: string) => {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const docRef = doc(db, "users", user.uid, "insulin_plan", id);
-        await deleteDoc(docRef);
-    } catch (e) {
-        console.error("Error deleting insulin dose", e);
-        throw e;
-    }
+    const doses = await getInsulinPlan();
+    const filtered = doses.filter(d => d.id !== id);
+    saveInsulinDoses(filtered);
 };
 
+// Toggle insulin dose enabled status
 export const toggleInsulinDose = async (id: string, currentStatus: boolean) => {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const docRef = doc(db, "users", user.uid, "insulin_plan", id);
-        await updateDoc(docRef, { enabled: !currentStatus });
-    } catch (e) {
-        console.error("Error toggling insulin dose", e);
-        throw e;
-    }
+    const doses = await getInsulinPlan();
+    const updated = doses.map(d =>
+        d.id === id ? { ...d, enabled: !currentStatus } : d
+    );
+    saveInsulinDoses(updated);
 };
 
 // Compatibility export
 export const saveInsulinPlan = async () => {
-    console.warn("saveInsulinPlan is deprecated in favor of direct Firestore ops");
+    console.warn("saveInsulinPlan is deprecated");
 };
