@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/Toast";
+import NeuralBackground from "../components/NeuralBackground";
 
 // Simple local user storage
 const LOCAL_USERS_KEY = "glucobot_users";
@@ -31,6 +32,11 @@ const saveLocalUser = (user: LocalUser): boolean => {
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [form, setForm] = useState({
     name: "",
@@ -46,26 +52,16 @@ export default function Register() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     // Validation
-    if (!form.name.trim()) {
-      toast("El nombre es obligatorio", "error");
-      return;
-    }
-    if (!form.email.trim()) {
-      toast("El correo es obligatorio", "error");
-      return;
-    }
-    if (form.password.length < 4) {
-      toast("La contraseña debe tener al menos 4 caracteres", "error");
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      toast("Las contraseñas no coinciden", "error");
-      return;
-    }
+    if (!form.name.trim()) return toast("El nombre es obligatorio", "error");
+    if (!form.email.trim()) return toast("El correo es obligatorio", "error");
+    if (form.password.length < 4) return toast("La contraseña debe tener al menos 4 caracteres", "error");
+    if (form.password !== form.confirmPassword) return toast("Las contraseñas no coinciden", "error");
 
     setIsLoading(true);
+    // Simular delay
+    await new Promise(r => setTimeout(r, 800));
 
     // Create user
     const newUser: LocalUser = {
@@ -100,23 +96,36 @@ export default function Register() {
   };
 
   return (
-    <div style={container}>
-      <div style={card}>
-        <h1 style={title}>Crear Cuenta</h1>
-        <p style={subtitle}>Registro rápido para Glucobot</p>
+    <div style={containerStyle}>
+      {/* BACKGROUND LAYERS */}
+      <div style={bgGradientStyle} />
+      <NeuralBackground opacity={0.3} />
 
-        <div style={fieldGroup}>
-          <label style={label}>Tipo de Usuario</label>
-          <select style={input} name="role" value={form.role} onChange={handleChange}>
-            <option value="patient">Paciente</option>
-            <option value="caretaker">Cuidador</option>
-          </select>
+      <div style={{
+        ...cardStyle,
+        transform: mounted ? "translateY(0)" : "translateY(30px)",
+        opacity: mounted ? 1 : 0
+      }}>
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+          <h1 style={titleStyle}>Crear Cuenta</h1>
+          <p style={subtitleStyle}>Únete a <span style={{ color: "#1F4FFF", fontWeight: "bold" }}>SanniBot</span></p>
         </div>
 
         <div style={fieldGroup}>
-          <label style={label}>Nombre Completo</label>
+          <label style={labelStyle}>Soy...</label>
+          <div style={selectWrapperStyle}>
+            <select style={selectStyle} name="role" value={form.role} onChange={handleChange}>
+              <option value="patient">Paciente</option>
+              <option value="caretaker">Cuidador</option>
+            </select>
+            <span style={selectArrowStyle}>▼</span>
+          </div>
+        </div>
+
+        <div style={fieldGroup}>
+          <label style={labelStyle}>Nombre Completo</label>
           <input
-            style={input}
+            style={inputStyle}
             name="name"
             placeholder="Juan Pérez"
             value={form.name}
@@ -125,9 +134,9 @@ export default function Register() {
         </div>
 
         <div style={fieldGroup}>
-          <label style={label}>Correo Electrónico</label>
+          <label style={labelStyle}>Correo Electrónico</label>
           <input
-            style={input}
+            style={inputStyle}
             name="email"
             type="email"
             placeholder="correo@ejemplo.com"
@@ -138,9 +147,9 @@ export default function Register() {
 
         <div style={row}>
           <div style={{ flex: 1 }}>
-            <label style={label}>Contraseña</label>
+            <label style={labelStyle}>Contraseña</label>
             <input
-              style={input}
+              style={inputStyle}
               name="password"
               type="password"
               placeholder="••••••"
@@ -149,9 +158,9 @@ export default function Register() {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={label}>Confirmar</label>
+            <label style={labelStyle}>Confirmar</label>
             <input
-              style={input}
+              style={inputStyle}
               name="confirmPassword"
               type="password"
               placeholder="••••••"
@@ -162,7 +171,7 @@ export default function Register() {
         </div>
 
         <button
-          style={{ ...btn, opacity: isLoading ? 0.7 : 1 }}
+          style={{ ...btnStyle, opacity: isLoading ? 0.7 : 1 }}
           onClick={handleRegister}
           disabled={isLoading}
         >
@@ -170,8 +179,8 @@ export default function Register() {
         </button>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
-          <button onClick={() => navigate("/login")} style={linkBtn}>
-            ¿Ya tienes cuenta? <span style={{ color: "#2563EB" }}>Inicia sesión</span>
+          <button onClick={() => navigate("/login")} style={linkBtnStyle}>
+            ¿Ya tienes cuenta? <span style={{ color: "#1F4FFF", fontWeight: "bold" }}>Inicia sesión</span>
           </button>
         </div>
       </div>
@@ -180,83 +189,122 @@ export default function Register() {
 }
 
 // Styles
-const container: React.CSSProperties = {
+const containerStyle: React.CSSProperties = {
   minHeight: "100vh",
+  width: "100%",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-  padding: "20px"
+  position: "relative",
+  overflow: "hidden",
+  fontFamily: "'Inter', sans-serif"
 };
 
-const card: React.CSSProperties = {
-  background: "white",
+const bgGradientStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  background: "radial-gradient(circle at 50% -20%, #eff6ff 0%, #f0f9ff 40%, #ffffff 100%)",
+  zIndex: -1
+};
+
+const cardStyle: React.CSSProperties = {
+  position: "relative",
+  zIndex: 10,
+  background: "rgba(255, 255, 255, 0.8)",
+  backdropFilter: "blur(20px)",
+  border: "1px solid rgba(255, 255, 255, 0.9)",
+  borderRadius: "24px",
   padding: "40px",
-  borderRadius: "20px",
   width: "100%",
-  maxWidth: "400px",
-  boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+  maxWidth: "420px",
+  boxShadow: "0 20px 60px -10px rgba(0, 0, 0, 0.08)",
+  transition: "all 0.6s cubic-bezier(0.22, 1, 0.36, 1)"
 };
 
-const title: React.CSSProperties = {
+const titleStyle: React.CSSProperties = {
   fontSize: "28px",
   fontWeight: "800",
   color: "#1F2937",
   margin: "0 0 5px",
-  textAlign: "center"
+  letterSpacing: "-0.5px"
 };
 
-const subtitle: React.CSSProperties = {
+const subtitleStyle: React.CSSProperties = {
   color: "#6B7280",
-  textAlign: "center",
-  marginBottom: "30px"
+  fontSize: "15px"
 };
 
 const fieldGroup: React.CSSProperties = {
   marginBottom: "16px"
 };
 
-const label: React.CSSProperties = {
+const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: "14px",
-  fontWeight: "600",
+  fontSize: "13px",
+  fontWeight: "700",
   color: "#374151",
-  marginBottom: "6px"
+  marginBottom: "6px",
+  textTransform: "uppercase"
 };
 
-const input: React.CSSProperties = {
+const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "12px 16px",
-  borderRadius: "10px",
-  border: "1px solid #D1D5DB",
+  padding: "14px 16px",
+  borderRadius: "12px",
+  border: "2px solid #E5E7EB",
   fontSize: "16px",
-  backgroundColor: "#F9FAFB",
-  boxSizing: "border-box"
+  backgroundColor: "rgba(255,255,255,0.6)",
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "border-color 0.2s"
+};
+
+const selectWrapperStyle: React.CSSProperties = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center"
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  cursor: "pointer",
+  appearance: "none"
+};
+
+const selectArrowStyle: React.CSSProperties = {
+  position: "absolute",
+  right: "15px",
+  pointerEvents: "none",
+  color: "#6B7280",
+  fontSize: "12px"
 };
 
 const row: React.CSSProperties = {
   display: "flex",
   gap: "12px",
-  marginBottom: "16px"
+  marginBottom: "20px"
 };
 
-const btn: React.CSSProperties = {
+const btnStyle: React.CSSProperties = {
   width: "100%",
-  padding: "14px",
-  borderRadius: "12px",
-  backgroundColor: "#7C3AED",
+  padding: "16px",
+  borderRadius: "14px",
+  background: "linear-gradient(135deg, #1F4FFF 0%, #06B6D4 100%)",
   color: "white",
   border: "none",
   fontSize: "16px",
   fontWeight: "700",
   cursor: "pointer",
-  marginTop: "10px"
+  marginTop: "10px",
+  boxShadow: "0 8px 20px -5px rgba(31, 79, 255, 0.3)",
+  transition: "transform 0.1s"
 };
 
-const linkBtn: React.CSSProperties = {
+const linkBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
   color: "#6B7280",
   cursor: "pointer",
-  fontSize: "14px"
+  fontSize: "14px",
+  fontWeight: "500"
 };
