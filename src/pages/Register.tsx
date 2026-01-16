@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/Toast";
 import NeuralBackground from "../components/NeuralBackground";
 import { register } from "../services/authService";
-import type { User } from "../services/authService";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -30,34 +29,45 @@ export default function Register() {
 
   const handleRegister = async () => {
     // Validation
-    if (!form.name.trim()) return toast("El nombre es obligatorio", "error");
-    if (!form.email.trim()) return toast("El correo es obligatorio", "error");
-    if (form.password.length < 6) return toast("La contraseña debe tener al menos 6 caracteres", "error");
-    if (form.password !== form.confirmPassword) return toast("Las contraseñas no coinciden", "error");
+    if (!form.name.trim()) {
+      toast("El nombre es obligatorio", "error");
+      return;
+    }
+    if (!form.email.trim()) {
+      toast("El correo es obligatorio", "error");
+      return;
+    }
+    if (form.password.length < 6) {
+      toast("La contraseña debe tener al menos 6 caracteres", "error");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      toast("Las contraseñas no coinciden", "error");
+      return;
+    }
 
     setIsLoading(true);
 
-    // Prepare User object for service
-    const newUser: User = {
-      id: "", // Will be assigned by Firebase
-      username: form.email.toLowerCase(), // Using email as username for now
-      name: form.name,
-      role: form.role
-    };
-
     try {
-      const result = await register(newUser, form.password);
+      const result = await register(
+        {
+          username: form.email.toLowerCase(),
+          name: form.name,
+          role: form.role
+        },
+        form.password
+      );
 
       if (result.success) {
         toast("¡Cuenta creada con éxito!", "success");
-        // Auto-login logic handles session via AuthContext usually, but we can redirect
+        // Navigate to onboarding to complete health profile
         setTimeout(() => {
           if (form.role === "patient") {
-            navigate("/welcome-call");
+            navigate("/onboarding");
           } else {
-            navigate("/caretaker"); // Or wherever caretakers go
+            navigate("/caretaker");
           }
-        }, 1000);
+        }, 800);
       } else {
         toast(result.error || "Error al registrar", "error");
         setIsLoading(false);
@@ -88,7 +98,13 @@ export default function Register() {
         <div style={fieldGroup}>
           <label style={labelStyle}>Soy...</label>
           <div style={selectWrapperStyle}>
-            <select style={selectStyle} name="role" value={form.role} onChange={handleChange}>
+            <select
+              style={selectStyle}
+              name="role"
+              value={form.role}
+              onChange={handleChange}
+              disabled={isLoading}
+            >
               <option value="patient">Paciente</option>
               <option value="caretaker">Cuidador</option>
             </select>
@@ -104,6 +120,7 @@ export default function Register() {
             placeholder="Juan Pérez"
             value={form.name}
             onChange={handleChange}
+            disabled={isLoading}
           />
         </div>
 
@@ -116,6 +133,7 @@ export default function Register() {
             placeholder="correo@ejemplo.com"
             value={form.email}
             onChange={handleChange}
+            disabled={isLoading}
           />
         </div>
 
@@ -129,6 +147,7 @@ export default function Register() {
               placeholder="••••••"
               value={form.password}
               onChange={handleChange}
+              disabled={isLoading}
             />
           </div>
           <div style={{ flex: 1 }}>
@@ -140,20 +159,30 @@ export default function Register() {
               placeholder="••••••"
               value={form.confirmPassword}
               onChange={handleChange}
+              onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleRegister()}
+              disabled={isLoading}
             />
           </div>
         </div>
 
         <button
-          style={{ ...btnStyle, opacity: isLoading ? 0.7 : 1 }}
+          style={{
+            ...btnStyle,
+            opacity: isLoading ? 0.7 : 1,
+            cursor: isLoading ? "not-allowed" : "pointer"
+          }}
           onClick={handleRegister}
           disabled={isLoading}
         >
-          {isLoading ? "Creando..." : "Crear Cuenta"}
+          {isLoading ? "⏳ Creando cuenta..." : "Crear Cuenta"}
         </button>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
-          <button onClick={() => navigate("/login")} style={linkBtnStyle}>
+          <button
+            onClick={() => navigate("/login")}
+            style={linkBtnStyle}
+            disabled={isLoading}
+          >
             ¿Ya tienes cuenta? <span style={{ color: "#1F4FFF", fontWeight: "bold" }}>Inicia sesión</span>
           </button>
         </div>

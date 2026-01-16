@@ -7,7 +7,6 @@ import { login, loginWithGoogle } from "../services/authService";
 export default function Login() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    // const { refreshUser } = useAuth(); // Not used directly here anymore // AuthContext should also be listening to firebase
 
     const [form, setForm] = useState({
         email: "",
@@ -15,6 +14,7 @@ export default function Login() {
     });
 
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -26,21 +26,25 @@ export default function Login() {
     };
 
     const handleLogin = async () => {
-        if (!form.email.trim() || !form.password) {
-            toast("Ingresa correo y contraseña", "error");
+        if (!form.email.trim()) {
+            toast("Ingresa tu correo electrónico", "error");
+            return;
+        }
+        if (!form.password) {
+            toast("Ingresa tu contraseña", "error");
             return;
         }
 
         setIsLoading(true);
 
         try {
-            const user = await login(form.email, form.password);
+            const result = await login(form.email, form.password);
 
-            if (user) {
-                toast(`¡Bienvenido, ${user.name || "Usuario"}!`, "success");
+            if (result.user) {
+                toast(`¡Bienvenido, ${result.user.name}!`, "success");
                 navigate("/home");
             } else {
-                toast("Correo o contraseña incorrectos", "error");
+                toast(result.error || "Correo o contraseña incorrectos", "error");
             }
         } catch (e) {
             console.error(e);
@@ -51,7 +55,7 @@ export default function Login() {
     };
 
     const handleGoogleLogin = async () => {
-        setIsLoading(true);
+        setIsGoogleLoading(true);
         try {
             const result = await loginWithGoogle();
             if (result.user) {
@@ -64,9 +68,11 @@ export default function Login() {
             console.error(e);
             toast("Error inesperado con Google", "error");
         } finally {
-            setIsLoading(false);
+            setIsGoogleLoading(false);
         }
-    }
+    };
+
+    const isAnyLoading = isLoading || isGoogleLoading;
 
     return (
         <div style={containerStyle}>
@@ -85,7 +91,6 @@ export default function Login() {
                     alt="SanniBot"
                     style={robotImageStyle}
                 />
-                {/* Glow effect behind robot */}
                 <div style={robotGlowStyle} />
             </div>
 
@@ -117,6 +122,7 @@ export default function Login() {
                             placeholder="tu@correo.com"
                             value={form.email}
                             onChange={handleChange}
+                            disabled={isAnyLoading}
                         />
                     </div>
                 </div>
@@ -132,7 +138,8 @@ export default function Login() {
                             placeholder="••••••••"
                             value={form.password}
                             onChange={handleChange}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            onKeyDown={(e) => e.key === 'Enter' && !isAnyLoading && handleLogin()}
+                            disabled={isAnyLoading}
                         />
                     </div>
                 </div>
@@ -142,14 +149,14 @@ export default function Login() {
                     style={{
                         ...buttonStyle,
                         opacity: isLoading ? 0.8 : 1,
-                        transform: isLoading ? "scale(0.98)" : "scale(1)"
+                        cursor: isAnyLoading ? "not-allowed" : "pointer"
                     }}
                     onClick={handleLogin}
-                    disabled={isLoading}
+                    disabled={isAnyLoading}
                 >
                     {isLoading ? (
                         <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span className="loader">⌛</span> Entrando...
+                            ⏳ Entrando...
                         </span>
                     ) : (
                         "Iniciar Sesión"
@@ -160,18 +167,23 @@ export default function Login() {
                     onClick={handleGoogleLogin}
                     style={{
                         ...googleBtnStyle,
-                        opacity: isLoading ? 0.6 : 1
+                        opacity: isGoogleLoading ? 0.7 : 1,
+                        cursor: isAnyLoading ? "not-allowed" : "pointer"
                     }}
-                    disabled={isLoading}
+                    disabled={isAnyLoading}
                 >
-                    <span style={{ marginRight: "10px", fontSize: "18px" }}>G</span> Continuar con Google
+                    {isGoogleLoading ? (
+                        <span>⏳ Conectando con Google...</span>
+                    ) : (
+                        <><span style={{ marginRight: "10px", fontSize: "18px" }}>G</span> Continuar con Google</>
+                    )}
                 </button>
 
                 <div style={{ textAlign: "center", marginTop: "25px" }}>
                     <p style={{ color: "#6B7280", fontSize: "14px" }}>
                         ¿Aún no tienes cuenta?
                     </p>
-                    <button onClick={() => navigate("/register")} style={linkStyle}>
+                    <button onClick={() => navigate("/register")} style={linkStyle} disabled={isAnyLoading}>
                         Crear cuenta nueva
                     </button>
                 </div>
@@ -179,17 +191,17 @@ export default function Login() {
             </div>
 
             <style>{`
-        @keyframes float {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-15px); }
-          100% { transform: translateY(0px); }
-        }
-        @keyframes pulse-glow {
-          0% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
-          50% { box-shadow: 0 0 50px rgba(6, 182, 212, 0.5); }
-          100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
-        }
-      `}</style>
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-15px); }
+                    100% { transform: translateY(0px); }
+                }
+                @keyframes pulse-glow {
+                    0% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
+                    50% { box-shadow: 0 0 50px rgba(6, 182, 212, 0.5); }
+                    100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
+                }
+            `}</style>
         </div>
     );
 }
@@ -223,7 +235,7 @@ const robotContainerStyle: React.CSSProperties = {
     zIndex: 0,
     transition: "all 1s cubic-bezier(0.34, 1.56, 0.64, 1)",
     animation: "float 6s ease-in-out infinite",
-    display: "flex", // Centering for glow
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
     pointerEvents: "none"
@@ -247,7 +259,6 @@ const robotGlowStyle: React.CSSProperties = {
     filter: "blur(40px)",
     animation: "pulse-glow 3s infinite"
 };
-
 
 const cardStyle: React.CSSProperties = {
     position: "relative",
@@ -353,7 +364,7 @@ const googleBtnStyle: React.CSSProperties = {
     alignItems: "center",
     justifyContent: "center",
     transition: "background 0.2s"
-}
+};
 
 const linkStyle: React.CSSProperties = {
     background: "none",

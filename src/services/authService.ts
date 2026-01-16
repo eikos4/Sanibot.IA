@@ -13,214 +13,259 @@ import { auth, db } from "../firebase/config";
 
 export interface User {
     id: string;
-    username: string; // Email en Firebase (o RUT convertido)
+    username: string;
     email?: string;
     name: string;
     role: "patient" | "caretaker" | "admin";
     profileCompleted?: boolean;
 }
 
-// Helper to get user profile from Firestore
+// Constants
+const FIRESTORE_TIMEOUT = 8000; // 8 seconds
+const LOCAL_STORAGE_KEY = "glucobot_current_user";
+const PENDING_PROFILE_KEY = "glucobot_pending_profile";
+
+// Helper: get user profile from Firestore with timeout
 const getProfile = async (uid: string): Promise<User | null> => {
-    try {
-        const docRef = doc(db, "users", uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return { id: uid, ...docSnap.data() } as User;
+    const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), FIRESTORE_TIMEOUT)
+    );
+
+    const fetchPromise = (async () => {
+        try {
+            const docRef = doc(db, "users", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return { id: uid, ...docSnap.data() } as User;
+            }
+        } catch (e: any) {
+            console.warn("Firestore getProfile failed:", e.message || e);
         }
-    } catch (e) {
-        console.error("Error fetching profile", e);
-    }
-    return null;
+        return null;
+    })();
+
+    return Promise.race([fetchPromise, timeoutPromise]);
 };
 
-// Helper to ensure username is an email (for Firebase Auth)
-const toEmail = (username: string) => {
-    // Basic email regex/check
-    if (username.includes("@")) return username;
-    // If it looks like a RUT (numbers + k), append domain
+// Helper: save profile to Firestore (non-blocking)
+const saveProfileAsync = async (uid: string, profileData: Omit<User, 'id'>): Promise<boolean> => {
+    try {
+        await setDoc(doc(db, "users", uid), profileData);
+        localStorage.removeItem(PENDING_PROFILE_KEY);
+        console.log("Profile saved to Firestore");
+        return true;
+    } catch (e: any) {
+        console.warn("Firestore saveProfile failed, saving locally:", e.message);
+        localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify({ uid, ...profileData }));
+        return false;
+    }
+};
+
+// Helper: convert username to email format for Firebase Auth
+const toEmail = (username: string): string => {
+    if (username.includes("@")) return username.toLowerCase();
     return `${username.replace(/\./g, '')}@glucobot.app`;
 };
+
+// ============ PUBLIC API ============
 
 export const loginWithGoogle = async (): Promise<{ user: User | null; error?: string }> => {
     try {
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+
         const result = await signInWithPopup(auth, provider);
         const fbUser = result.user;
 
-        // Timeout promise for Firestore operations (15s)
-        const timeoutPromise = new Promise<{ user: User | null }>((_, reject) =>
-            setTimeout(() => reject(new Error("firestore-timeout")), 15000)
-        );
-
-        const dbOperation = async (): Promise<{ user: User | null }> => {
-            // Check if user exists in Firestore, if not create it
-            let profile = await getProfile(fbUser.uid);
-
-            if (!profile) {
-                // New Google User -> Create defaults
-                profile = {
-                    id: fbUser.uid,
-                    username: fbUser.email || "",
-                    name: fbUser.displayName || "Usuario Google",
-                    role: "patient" // Default role for Google Sign-In
-                };
-
-                await setDoc(doc(db, "users", fbUser.uid), {
-                    username: profile.username,
-                    email: fbUser.email,
-                    name: profile.name,
-                    role: profile.role
-                });
-            }
-            return { user: profile };
+        // Create immediate profile from Google Auth data
+        const user: User = {
+            id: fbUser.uid,
+            username: fbUser.email || "",
+            email: fbUser.email || undefined,
+            name: fbUser.displayName || "Usuario",
+            role: "patient"
         };
 
-        // Race between DB op and Timeout
-        return await Promise.race([dbOperation(), timeoutPromise]);
+        // Try to get existing profile from Firestore (with timeout)
+        const existingProfile = await getProfile(fbUser.uid);
 
-    } catch (error: any) {
-        console.error("Error with Google Sign-In", error);
-        let errorMsg = "Hubo un problema al iniciar sesión con Google.";
-
-        if (error.message === "firestore-timeout") {
-            errorMsg = "La conexión con la base de datos tardó demasiado. Por favor, verifica tu internet.";
-        } else if (error.code === "unavailable" || error.code === "failed-precondition" || error.message.includes("offline")) {
-            errorMsg = "No se pudo conectar con la base de datos. Verifica tu conexión a internet o cortafuegos.";
-        } else if (error.code === "auth/operation-not-allowed") {
-            errorMsg = "El inicio de sesión con Google no está habilitado en la consola de Firebase.";
-        } else if (error.code === "auth/popup-closed-by-user") {
-            errorMsg = "Se cerró la ventana de Google antes de completar.";
-        } else if (error.code === "auth/configuration-not-found") {
-            errorMsg = "Error de configuración: Habilita el proveedor de Google en la consola de Firebase.";
-        } else if (error.code === "permission-denied") {
-            errorMsg = "Permisos insuficientes. Verifica que la Base de Datos Firestore esté creada en la consola.";
+        if (existingProfile) {
+            // User exists in Firestore, use that data
+            return { user: existingProfile };
         }
 
+        // New user - save profile asynchronously (don't block login)
+        saveProfileAsync(fbUser.uid, {
+            username: user.username,
+            email: user.email,
+            name: user.name,
+            role: user.role
+        });
+
+        return { user };
+
+    } catch (error: any) {
+        console.error("Google Sign-In error:", error);
+
+        const errorMessages: Record<string, string> = {
+            "auth/popup-closed-by-user": "Se cerró la ventana de Google antes de completar.",
+            "auth/popup-blocked": "El navegador bloqueó la ventana emergente. Permite ventanas emergentes para este sitio.",
+            "auth/cancelled-popup-request": "Se canceló la solicitud de autenticación.",
+            "auth/operation-not-allowed": "El inicio de sesión con Google no está habilitado.",
+            "auth/network-request-failed": "Error de red. Verifica tu conexión a internet."
+        };
+
+        const errorMsg = errorMessages[error.code] || "Hubo un problema al iniciar sesión con Google.";
+        return { user: null, error: errorMsg };
+    }
+};
+
+export const login = async (username: string, password: string): Promise<{ user: User | null; error?: string }> => {
+    if (!username || !password) {
+        return { user: null, error: "Correo y contraseña son obligatorios" };
+    }
+
+    const email = toEmail(username);
+
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const fbUser = userCredential.user;
+
+        // Try to get profile from Firestore
+        const profile = await getProfile(fbUser.uid);
+
+        // Even if Firestore fails, we can log in with basic info
+        const user: User = profile || {
+            id: fbUser.uid,
+            username: username,
+            email: fbUser.email || undefined,
+            name: fbUser.displayName || "Usuario",
+            role: "patient"
+        };
+
+        return { user };
+
+    } catch (error: any) {
+        console.error("Login error:", error);
+
+        const errorMessages: Record<string, string> = {
+            "auth/user-not-found": "No existe una cuenta con este correo.",
+            "auth/wrong-password": "Contraseña incorrecta.",
+            "auth/invalid-credential": "Correo o contraseña incorrectos.",
+            "auth/invalid-email": "El formato del correo es inválido.",
+            "auth/user-disabled": "Esta cuenta ha sido deshabilitada.",
+            "auth/too-many-requests": "Demasiados intentos fallidos. Intenta más tarde.",
+            "auth/network-request-failed": "Error de red. Verifica tu conexión."
+        };
+
+        const errorMsg = errorMessages[error.code] || "Error al iniciar sesión.";
         return { user: null, error: errorMsg };
     }
 };
 
 const getAuthErrorMessage = (error: any): string => {
-    switch (error.code) {
-        case "auth/email-already-in-use":
-            return "Este RUT o correo ya tiene una cuenta. Intenta iniciar sesión en lugar de registrarte.";
-        case "auth/invalid-email":
-            return "El formato del correo es inválido.";
-        case "auth/operation-not-allowed":
-            return "El registro con correo y contraseña no está habilitado. Por favor, contacta al administrador.";
-        case "auth/weak-password":
-            return "La contraseña es muy débil. Debe tener al menos 6 caracteres.";
-        case "auth/configuration-not-found":
-            return "Error de configuración de Firebase. Por favor, habilita 'Email/Password' en la consola de Firebase.";
-        default:
-            return "Hubo un error inesperado al registrar la cuenta. Por favor, intenta de nuevo.";
-    }
+    const messages: Record<string, string> = {
+        "auth/email-already-in-use": "Este correo ya tiene una cuenta. Intenta iniciar sesión.",
+        "auth/invalid-email": "El formato del correo es inválido.",
+        "auth/operation-not-allowed": "El registro no está habilitado. Contacta al administrador.",
+        "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+        "auth/network-request-failed": "Error de red. Verifica tu conexión."
+    };
+    return messages[error.code] || "Error al crear la cuenta. Intenta de nuevo.";
 };
 
-export const register = async (user: User, password?: string): Promise<{ success: boolean; error?: string; firestoreFailed?: boolean }> => {
-    if (!password) {
-        return { success: false, error: "La contraseña es obligatoria." };
+export const register = async (
+    user: Omit<User, 'id'>,
+    password: string
+): Promise<{ success: boolean; error?: string; user?: User }> => {
+    if (!password || password.length < 6) {
+        return { success: false, error: "La contraseña debe tener al menos 6 caracteres." };
     }
+
     const email = toEmail(user.username);
 
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const fbUser = userCredential.user;
 
-        // Update Display Name
+        // Update Display Name in Firebase Auth
         await updateProfile(fbUser, { displayName: user.name });
 
-        // Try to save extra data (Rol) to Firestore, but don't block if it fails
-        let firestoreFailed = false;
-        try {
-            await setDoc(doc(db, "users", fbUser.uid), {
-                username: user.username, // Save ORIGINAL username (RUT or Email)
-                email: email,
-                name: user.name,
-                role: user.role
-            });
-        } catch (firestoreError: any) {
-            console.warn("Firestore save failed during registration, will retry on next login:", firestoreError);
-            firestoreFailed = true;
-            // Save to localStorage as backup
-            localStorage.setItem("glucobot_pending_profile", JSON.stringify({
-                uid: fbUser.uid,
-                username: user.username,
-                email: email,
-                name: user.name,
-                role: user.role
-            }));
-        }
+        // Create full user object
+        const newUser: User = {
+            id: fbUser.uid,
+            username: user.username,
+            email: email,
+            name: user.name,
+            role: user.role || "patient"
+        };
 
-        return { success: true, firestoreFailed };
+        // Save to Firestore (non-blocking)
+        saveProfileAsync(fbUser.uid, {
+            username: user.username,
+            email: email,
+            name: user.name,
+            role: user.role || "patient"
+        });
+
+        return { success: true, user: newUser };
+
     } catch (error: any) {
-        console.error("Error registering:", error);
+        console.error("Registration error:", error);
         return { success: false, error: getAuthErrorMessage(error) };
     }
 };
 
-export const login = async (username: string, password?: string): Promise<User | null> => {
-    if (!password) return null;
-    const email = toEmail(username);
-
-    try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // Fetch full profile including Role
-        const profile = await getProfile(userCredential.user.uid);
-        return profile || {
-            id: userCredential.user.uid,
-            username: username, // Return the input username if profile not found
-            name: userCredential.user.displayName || "Usuario",
-            role: "patient" // Fallback
-        };
-    } catch (error) {
-        console.error("Error logging in:", error);
-        return null;
-    }
-};
-
-export const logout = async () => {
+export const logout = async (): Promise<void> => {
     try {
         await signOut(auth);
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(PENDING_PROFILE_KEY);
     } catch (error) {
-        console.error("Error signing out:", error);
+        console.error("Logout error:", error);
     }
 };
 
-// Listener para cambios de estado con fetch de perfil
+// Auth state listener with resilient profile fetching
 export const subscribeToAuthChanges = (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-            // Check if there's a pending profile to sync from localStorage
-            const pendingProfile = localStorage.getItem("glucobot_pending_profile");
+            // First, try to sync any pending profile
+            const pendingProfile = localStorage.getItem(PENDING_PROFILE_KEY);
             if (pendingProfile) {
                 try {
                     const profileData = JSON.parse(pendingProfile);
                     if (profileData.uid === firebaseUser.uid) {
-                        console.log("Syncing pending profile to Firestore...");
                         await setDoc(doc(db, "users", firebaseUser.uid), {
                             username: profileData.username,
                             email: profileData.email,
                             name: profileData.name,
                             role: profileData.role
                         });
-                        localStorage.removeItem("glucobot_pending_profile");
-                        console.log("Pending profile synced successfully!");
+                        localStorage.removeItem(PENDING_PROFILE_KEY);
+                        console.log("Synced pending profile to Firestore");
                     }
-                } catch (syncError) {
-                    console.warn("Failed to sync pending profile, will retry later:", syncError);
+                } catch (e) {
+                    console.warn("Could not sync pending profile:", e);
                 }
             }
 
+            // Get profile from Firestore (with timeout fallback)
             const profile = await getProfile(firebaseUser.uid);
-            callback(profile || {
+
+            const user: User = profile || {
                 id: firebaseUser.uid,
                 username: firebaseUser.email || "",
+                email: firebaseUser.email || undefined,
                 name: firebaseUser.displayName || "Usuario",
                 role: "patient"
-            });
+            };
+
+            // Cache locally
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(user));
+            callback(user);
         } else {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
             callback(null);
         }
     });
@@ -231,15 +276,36 @@ export const deleteAccount = async (): Promise<boolean> => {
     if (!user) return false;
 
     try {
-        // 1. Convert username/RUT to email format potentially used in ID or just use uid
-        // Strategy: Delete firestore document first, then auth user
+        // Delete Firestore document first
+        try {
+            await deleteDoc(doc(db, "users", user.uid));
+        } catch (e) {
+            console.warn("Could not delete Firestore doc:", e);
+        }
 
-        await deleteDoc(doc(db, "users", user.uid));
+        // Delete Firebase Auth user
         await deleteUser(user);
+
+        // Clean up local storage
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(PENDING_PROFILE_KEY);
+
         return true;
-    } catch (error) {
-        console.error("Error deleting account:", error);
-        // If requires recent login, we might need to re-authenticate, but let's try simple first
+    } catch (error: any) {
+        console.error("Delete account error:", error);
+        if (error.code === "auth/requires-recent-login") {
+            throw new Error("Necesitas volver a iniciar sesión para eliminar tu cuenta.");
+        }
         return false;
+    }
+};
+
+// Get current user from cache (for immediate access)
+export const getCachedUser = (): User | null => {
+    try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        return cached ? JSON.parse(cached) : null;
+    } catch {
+        return null;
     }
 };

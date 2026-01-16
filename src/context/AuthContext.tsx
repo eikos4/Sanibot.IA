@@ -1,18 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { subscribeToAuthChanges, logout as serviceLogout } from "../services/authService";
+import { subscribeToAuthChanges, logout as serviceLogout, getCachedUser } from "../services/authService";
 import type { User } from "../services/authService";
 
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     logout: () => void;
-    refreshUser: () => void; // Kept for interface compatibility but might be less needed with realtime auth
+    refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    // Initialize with cached user for immediate display
+    const [user, setUser] = useState<User | null>(() => getCachedUser());
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -20,27 +21,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = subscribeToAuthChanges((currentUser) => {
             setUser(currentUser);
             setIsLoading(false);
-
-            // Sync local storage for non-auth-context needs (redundancy)
-            if (currentUser) {
-                localStorage.setItem("glucobot_current_user", JSON.stringify(currentUser));
-            } else {
-                localStorage.removeItem("glucobot_current_user");
-            }
         });
 
-        return () => unsubscribe();
+        // Timeout to avoid infinite loading if Firebase never responds
+        const timeout = setTimeout(() => {
+            if (isLoading) {
+                console.warn("Auth state check timed out, using cached user");
+                setIsLoading(false);
+            }
+        }, 10000); // 10 second timeout
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timeout);
+        };
     }, []);
 
     const logout = () => {
         serviceLogout();
         setUser(null);
-        localStorage.removeItem("glucobot_current_user");
     };
 
     const refreshUser = () => {
-        // With Firebase listener, manual refresh is rarely needed unless we want to re-fetch profile doc explicitly
-        // For now, we rely on the listener update or we could implement re-fetch logic in authService
+        // Trigger a re-subscribe if needed
+        // For now, Firebase listener handles this automatically
     };
 
     return (

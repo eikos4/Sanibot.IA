@@ -21,13 +21,13 @@ export default function WelcomeCall() {
 
     useEffect(() => {
         if (phase === "answered") {
-            // Start the conversation
+            // Start the conversation - profile is now complete
             const messages = [
-                `¡Hola ${userName}! 👋`,
-                "Soy GlucoBot, tu asistente de salud personal.",
-                "Estaré aquí para ayudarte a controlar tu diabetes.",
-                "Te recordaré tus medicamentos, registraré tu glucosa y estaré disponible cuando me necesites.",
-                "¡Empecemos a configurar tu perfil!"
+                `¡Felicidades ${userName}! 🎉`,
+                "Has completado tu perfil de salud.",
+                "Soy GlucoBot, tu asistente personal.",
+                "Te ayudaré a controlar tu diabetes día a día.",
+                "¡Vamos a tu panel principal!"
             ];
 
             let index = 0;
@@ -40,14 +40,14 @@ export default function WelcomeCall() {
                     setMessage(messages[index]);
                 } else {
                     clearInterval(interval);
-                    // Navigate to onboarding after messages
-                    setTimeout(() => navigate("/onboarding"), 2000);
+                    // Navigate to home after completing setup
+                    setTimeout(() => navigate("/home"), 2000);
                 }
             }, 2500);
 
             // Speak the welcome message
             if ("speechSynthesis" in window) {
-                const fullMessage = `Hola ${userName}! Soy GlucoBot, tu asistente de salud personal. Estaré aquí para ayudarte a controlar tu diabetes. Empecemos a configurar tu perfil!`;
+                const fullMessage = `Felicidades ${userName}! Has completado tu perfil de salud. Soy GlucoBot, tu asistente personal. Te ayudaré a controlar tu diabetes día a día.`;
                 const utterance = new SpeechSynthesisUtterance(fullMessage);
                 utterance.lang = "es-ES";
                 utterance.rate = 0.9;
@@ -101,9 +101,23 @@ export default function WelcomeCall() {
                 )}
 
                 {phase === "talking" && (
-                    <div style={messageBubble}>
-                        <p style={messageText}>{message}</p>
-                    </div>
+                    <>
+                        <div style={messageBubble}>
+                            <p style={messageText}>{message}</p>
+                        </div>
+                        <button
+                            style={hangUpBtn}
+                            onClick={() => {
+                                // Stop speech synthesis
+                                if ("speechSynthesis" in window) {
+                                    window.speechSynthesis.cancel();
+                                }
+                                navigate("/home");
+                            }}
+                        >
+                            📞 Colgar e ir al Dashboard
+                        </button>
+                    </>
                 )}
             </div>
 
@@ -206,6 +220,20 @@ const answerBtn: React.CSSProperties = {
     fontWeight: "700",
     cursor: "pointer",
     boxShadow: "0 8px 25px rgba(34, 197, 94, 0.4)"
+};
+
+const hangUpBtn: React.CSSProperties = {
+    padding: "14px 30px",
+    borderRadius: "25px",
+    background: "#EF4444",
+    color: "white",
+    border: "none",
+    fontSize: "16px",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginTop: "20px",
+    boxShadow: "0 6px 20px rgba(239, 68, 68, 0.4)",
+    transition: "transform 0.2s, background 0.2s"
 };
 
 const messageBubble: React.CSSProperties = {

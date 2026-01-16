@@ -68,7 +68,8 @@ export default function Onboarding() {
                 ...form,
                 nombre: user?.name || "Paciente"
             });
-            navigate("/home");
+            // After completing health profile, show welcome call as celebration
+            navigate("/welcome-call");
         } catch (error) {
             console.error("Error saving onboarding:", error);
             alert("Error al guardar. Intenta nuevamente.");
