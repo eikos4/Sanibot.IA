@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasAllowedRole(role) {
+      return role in ['patient', 'caretaker', 'admin'];
+    }
+
+    // USERS
+    // users/{uid} stores auth profile + patient data merged in this repo.
+    // Security: owner can read/write their doc.
+    // Prevent privilege escalation by blocking clients from setting role=admin.
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasAll(['role'])
+        && hasAllowedRole(request.resource.data.role)
+        && request.resource.data.role != 'admin';
+
+      allow update: if (isOwner(uid) || isAdmin())
+        && (
+          isAdmin()
+          || (
+            // non-admin users cannot change role
+            !(request.resource.data.keys().hasAny(['role']))
+            || request.resource.data.role == resource.data.role
+          )
+        )
+        && (
+          // if role is present, it must be valid
+          !(request.resource.data.keys().hasAny(['role']))
+          || hasAllowedRole(request.resource.data.role)
+        );
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // USER-OWNED COLLECTIONS (flat collections with userId field)
+    function isUserScopedDoc() {
+      return request.resource.data.keys().hasAny(['userId'])
+        ? request.resource.data.userId == request.auth.uid
+        : resource.data.userId == request.auth.uid;
+    }
+
+    match /glucose_readings/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /medicines/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /appointments/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /weight_history/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /insulin_doses/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /diet_plans/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /smoking_profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /smoking_cravings/{docId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

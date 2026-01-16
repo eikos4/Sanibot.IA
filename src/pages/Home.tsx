@@ -104,6 +104,7 @@ function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory,
           {sidebarItem("🩸", "Glicemia", "/glucose", navigate)}
           {sidebarItem("🍽", "Alimentación", "/food", navigate)}
           {sidebarItem("📅", "Citas", "/appointments", navigate)}
+          {sidebarItem("🚭", "Dejar de Fumar", "/quit-smoking", navigate)}
           {sidebarItem("🤖", "GlucoBot", "/robot", navigate)}
           {sidebarItem("👤", "Mi Perfil", "/profile", navigate)}
         </nav>
@@ -168,6 +169,7 @@ function HomeDesktop({ greeting, patient, navigate, lastGlucose, glucoseHistory,
           {bigCard("❤️", "Presión Arterial", "/pressure", "#FFF1F2", "#BE123C", navigate)}
           {bigCard("⚖️", "Control de Peso", "/weight", "#F3E8FF", "#7C3AED", navigate)}
           {bigCard("🍽", "Control de Alimentación", "/food", "#F0FDF4", "#10B981", navigate)}
+          {bigCard("🚭", "Dejar de Fumar", "/quit-smoking", "#ECFDF5", "#059669", navigate)}
           {bigCard("📅", "Citas Médicas", "/appointments", "#FFF7ED", "#F59E0B", navigate)}
           {bigCard("🤖", "Hablar con GlucoBot", "/robot", "#F5F3FF", "#8B5CF6", navigate)}
           {bigCard("📊", "Historia y Datos", "/profile", "#ECFEFF", "#06B6D4", navigate)}
@@ -564,6 +566,7 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
         {mobileCard("❤️", "Presión Arterial", "/pressure", "#FFF1F2", navigate)}
         {mobileCard("⚖️", "Control de Peso", "/weight", "#F3E8FF", navigate)}
         {mobileCard("🍽", "Alimentación", "/food", "#F0FDF4", navigate)}
+        {mobileCard("🚭", "Dejar de Fumar", "/quit-smoking", "#ECFDF5", navigate)}
         {mobileCard("📅", "Citas", "/appointments", "#FFF7ED", navigate)}
         {mobileCard("🤖", "GlucoBot", "/robot", "#F5F3FF", navigate)}
         {mobileCard("👤", "Mi Perfil", "/profile", "#ECFEFF", navigate)}

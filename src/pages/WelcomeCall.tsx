@@ -6,21 +6,43 @@ export default function WelcomeCall() {
     const [phase, setPhase] = useState<"ringing" | "answered" | "talking">("ringing");
     const [message, setMessage] = useState("");
 
+    const persistProfileCompleted = () => {
+        try {
+            const rawPatient = localStorage.getItem("glucobot_patient_data");
+            const patient = rawPatient ? JSON.parse(rawPatient) : {};
+            localStorage.setItem("glucobot_patient_data", JSON.stringify({ ...patient, profileCompleted: true }));
+        } catch {
+            // ignore
+        }
+
+        try {
+            const rawUser = localStorage.getItem("glucobot_current_user");
+            const u = rawUser ? JSON.parse(rawUser) : {};
+            localStorage.setItem("glucobot_current_user", JSON.stringify({ ...u, profileCompleted: true }));
+        } catch {
+            // ignore
+        }
+    };
+
     // Get user name from localStorage
     const savedUser = localStorage.getItem("glucobot_current_user");
     const userName = savedUser ? JSON.parse(savedUser).name?.split(" ")[0] : "Paciente";
 
     useEffect(() => {
+        if (phase !== "ringing") return;
+
         // Phone ringing animation for 3 seconds
         const ringTimer = setTimeout(() => {
             setPhase("answered");
         }, 3000);
 
         return () => clearTimeout(ringTimer);
-    }, []);
+    }, [phase]);
 
     useEffect(() => {
         if (phase === "answered") {
+            persistProfileCompleted();
+
             // Start the conversation - profile is now complete
             const messages = [
                 `¡Felicidades ${userName}! 🎉`,
@@ -41,7 +63,10 @@ export default function WelcomeCall() {
                 } else {
                     clearInterval(interval);
                     // Navigate to home after completing setup
-                    setTimeout(() => navigate("/home"), 2000);
+                    setTimeout(() => {
+                        persistProfileCompleted();
+                        navigate("/home");
+                    }, 2000);
                 }
             }, 2500);
 
@@ -112,6 +137,7 @@ export default function WelcomeCall() {
                                 if ("speechSynthesis" in window) {
                                     window.speechSynthesis.cancel();
                                 }
+                                persistProfileCompleted();
                                 navigate("/home");
                             }}
                         >

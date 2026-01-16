@@ -28,6 +28,7 @@ import Robot from "../pages/Robot";
 import DailyLog from "../pages/DailyLog";
 import WeightControl from "../pages/WeightControl";
 import InsulinControl from "../pages/insulin/InsulinControl";
+import QuitSmoking from "../pages/smoking/QuitSmoking";
 
 /* Medicinas */
 import Medicines from "../pages/medicines/Medicines";
@@ -88,6 +89,7 @@ export default function AppRouter() {
             <Route path="/pressure" element={<Pressure />} />
             <Route path="/weight" element={<WeightControl />} />
             <Route path="/insulin" element={<InsulinControl />} />
+            <Route path="/quit-smoking" element={<QuitSmoking />} />
 
             {/* Alimentación */}
             <Route path="/food" element={<Food />} />

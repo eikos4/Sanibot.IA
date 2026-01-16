@@ -8,7 +8,18 @@ import {
     signInWithPopup,
     deleteUser
 } from "firebase/auth";
-import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import {
+    doc,
+    setDoc,
+    getDoc,
+    deleteDoc,
+    collection,
+    getDocs,
+    query,
+    where,
+    writeBatch,
+    limit
+} from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 
 export interface User {
@@ -50,7 +61,7 @@ const getProfile = async (uid: string): Promise<User | null> => {
 // Helper: save profile to Firestore (non-blocking)
 const saveProfileAsync = async (uid: string, profileData: Omit<User, 'id'>): Promise<boolean> => {
     try {
-        await setDoc(doc(db, "users", uid), profileData);
+        await setDoc(doc(db, "users", uid), profileData, { merge: true });
         localStorage.removeItem(PENDING_PROFILE_KEY);
         console.log("Profile saved to Firestore");
         return true;
@@ -241,7 +252,7 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
                             email: profileData.email,
                             name: profileData.name,
                             role: profileData.role
-                        });
+                        }, { merge: true });
                         localStorage.removeItem(PENDING_PROFILE_KEY);
                         console.log("Synced pending profile to Firestore");
                     }
@@ -261,6 +272,17 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
                 role: "patient"
             };
 
+            // If onboarding data exists locally, keep the completion flag even if Firestore profile is stale.
+            try {
+                const rawPatientData = localStorage.getItem("glucobot_patient_data");
+                const localPatientData = rawPatientData ? JSON.parse(rawPatientData) : null;
+                if (localPatientData?.profileCompleted === true) {
+                    user.profileCompleted = true;
+                }
+            } catch {
+                // ignore
+            }
+
             // Cache locally
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(user));
             callback(user);
@@ -275,12 +297,52 @@ export const deleteAccount = async (): Promise<boolean> => {
     const user = auth.currentUser;
     if (!user) return false;
 
-    try {
-        // Delete Firestore document first
+    const deleteUserScopedCollection = async (collectionName: string, uid: string): Promise<void> => {
+        // Best-effort deletion. If it fails, we still proceed to delete auth user.
         try {
-            await deleteDoc(doc(db, "users", user.uid));
+            const q = query(
+                collection(db, collectionName),
+                where("userId", "==", uid),
+                limit(500)
+            );
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) return;
+
+            const batch = writeBatch(db);
+            snapshot.docs.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
         } catch (e) {
-            console.warn("Could not delete Firestore doc:", e);
+            console.warn(`Could not delete user-scoped collection ${collectionName}:`, e);
+        }
+    };
+
+    try {
+        // Delete Firestore data first (best-effort)
+        const uid = user.uid;
+
+        // Flat collections with userId field
+        await Promise.all([
+            deleteUserScopedCollection("glucose_readings", uid),
+            deleteUserScopedCollection("medicines", uid),
+            deleteUserScopedCollection("appointments", uid),
+            deleteUserScopedCollection("weight_history", uid),
+            deleteUserScopedCollection("insulin_doses", uid),
+            deleteUserScopedCollection("diet_plans", uid),
+            deleteUserScopedCollection("smoking_cravings", uid)
+        ]);
+
+        // Per-user doc collections
+        try {
+            await deleteDoc(doc(db, "smoking_profiles", uid));
+        } catch (e) {
+            console.warn("Could not delete smoking_profiles doc:", e);
+        }
+
+        try {
+            await deleteDoc(doc(db, "users", uid));
+        } catch (e) {
+            console.warn("Could not delete users doc:", e);
         }
 
         // Delete Firebase Auth user
@@ -289,6 +351,16 @@ export const deleteAccount = async (): Promise<boolean> => {
         // Clean up local storage
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(PENDING_PROFILE_KEY);
+        localStorage.removeItem("glucobot_patient_data");
+        localStorage.removeItem("glucobot_glucose");
+        localStorage.removeItem("glucobot_medicines");
+        localStorage.removeItem("glucobot_appointments");
+        localStorage.removeItem("glucobot_weight");
+        localStorage.removeItem("glucobot_user_height");
+        localStorage.removeItem("glucobot_insulin_plan");
+        localStorage.removeItem("glucobot_diet_plan");
+        localStorage.removeItem("glucobot_smoking_profile");
+        localStorage.removeItem("glucobot_smoking_cravings");
 
         return true;
     } catch (error: any) {

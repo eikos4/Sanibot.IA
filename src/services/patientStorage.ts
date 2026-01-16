@@ -61,7 +61,7 @@ export const savePatientData = async (data: Partial<PatientData>) => {
     const userRef = doc(db, "users", user.uid);
     // Race between Firestore and 3s timeout
     await Promise.race([
-      setDoc(userRef, data, { merge: true }),
+      setDoc(userRef, { ...data, profileCompleted: true }, { merge: true }),
       timeoutPromise(3000)
     ]);
   } catch (error) {
