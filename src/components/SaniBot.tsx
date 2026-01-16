@@ -62,6 +62,105 @@ export default function SaniBot({ message: initialMessage, initialOpen = true }:
         window.speechSynthesis.speak(utterance);
     }, []);
 
+    const buildHomeRecommendation = () => {
+        const getFirstName = () => {
+            try {
+                const raw = localStorage.getItem("glucobot_current_user");
+                const u = raw ? JSON.parse(raw) : null;
+                const name = (u?.name || u?.nombre || "Paciente") as string;
+                return name.split(" ")[0] || "Paciente";
+            } catch {
+                return "Paciente";
+            }
+        };
+
+        const userName = getFirstName();
+
+        const lastGlucoseText = (() => {
+            try {
+                const raw = localStorage.getItem("glucobot_glucose");
+                const history = raw ? JSON.parse(raw) : [];
+                const last = history?.length ? history[history.length - 1] : null;
+                const value = last?.valor;
+                if (typeof value !== "number") return null;
+
+                const when = last?.hora ? `a las ${last.hora}` : "";
+
+                if (value < 70) {
+                    return `Veo que tu última glicemia fue ${value} mg/dL ${when}. Está baja. Come algo con carbohidratos y vuelve a medir en 15 minutos.`;
+                }
+                if (value > 180) {
+                    return `Tu última glicemia fue ${value} mg/dL ${when}. Está alta. Toma agua y revisa tu plan de insulina o indicaciones médicas.`;
+                }
+                return `Tu última glicemia fue ${value} mg/dL ${when}. ¡Vas bien! Mantén el control.`;
+            } catch {
+                return null;
+            }
+        })();
+
+        const nextAppointmentText = (() => {
+            try {
+                const raw = localStorage.getItem("glucobot_appointments");
+                const apps = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(apps) || apps.length === 0) return null;
+
+                const now = new Date();
+                const sorted = [...apps].sort((a: any, b: any) => {
+                    const dateA = `${a.fecha || ""}T${a.hora || "00:00"}`;
+                    const dateB = `${b.fecha || ""}T${b.hora || "00:00"}`;
+                    return dateA.localeCompare(dateB);
+                });
+
+                const next = sorted.find((a: any) => {
+                    if (!a?.fecha) return false;
+                    const d = new Date(`${a.fecha}T${a.hora || "00:00"}`);
+                    return d.getTime() >= now.getTime();
+                });
+
+                if (!next) return null;
+                const dateLabel = next?.fecha ? new Date(next.fecha).toLocaleDateString() : "";
+                const timeLabel = next?.hora ? ` a las ${next.hora}` : "";
+                const doctorLabel = next?.doctor ? ` con ${next.doctor}` : "";
+                return `Recuerda que tu próxima cita es el ${dateLabel}${timeLabel}${doctorLabel}.`;
+            } catch {
+                return null;
+            }
+        })();
+
+        const medicineText = (() => {
+            try {
+                const raw = localStorage.getItem("glucobot_medicines");
+                const meds = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(meds) || meds.length === 0) return null;
+
+                const first = meds[0];
+                const name = first?.nombre;
+                const time = first?.horario || (Array.isArray(first?.horarios) ? first.horarios[0] : "");
+                if (!name) return null;
+                if (time) return `Tip rápido: revisa tu tratamiento. El primero en tu lista es ${name} a las ${time}.`;
+                return `Tip rápido: revisa tu tratamiento. El primero en tu lista es ${name}.`;
+            } catch {
+                return null;
+            }
+        })();
+
+        const parts = [lastGlucoseText, nextAppointmentText, medicineText].filter(Boolean) as string[];
+
+        if (parts.length === 0) {
+            const tip = getRandomTip();
+            return {
+                bubble: `Hola ${userName}. 💡 Consejo: ${tip}`,
+                speech: `Hola ${userName}. ${tip}`
+            };
+        }
+
+        const combined = parts.join(" ");
+        return {
+            bubble: `Hola ${userName}. ${combined}`,
+            speech: `Hola ${userName}. ${combined}`
+        };
+    };
+
     // --- DRAG HANDLERS ---
     const handlePointerDown = (e: React.PointerEvent | React.TouchEvent) => {
         // Obtenemos coordenadas sea mouse o touch
@@ -120,16 +219,20 @@ export default function SaniBot({ message: initialMessage, initialOpen = true }:
         e.stopPropagation();
         if (hasDraggedRef.current) return; // Si arrastró, no hacemos click
 
-        const newTip = getRandomTip();
-
-        if (!isOpen) {
+        // En /home damos recomendaciones contextuales; en otras rutas, damos consejo.
+        const isHome = location.pathname.includes("/home");
+        if (isHome) {
+            const rec = buildHomeRecommendation();
             setIsOpen(true);
-            setMessage("💡 Consejo: " + newTip);
-            speak("Aquí tienes un consejo: " + newTip);
-        } else {
-            setMessage("💡 Consejo: " + newTip);
-            speak("Sabías que... " + newTip);
+            setMessage(rec.bubble);
+            speak(rec.speech);
+            return;
         }
+
+        const newTip = getRandomTip();
+        setIsOpen(true);
+        setMessage("💡 Consejo: " + newTip);
+        speak("Aquí tienes un consejo: " + newTip);
     };
 
     return (

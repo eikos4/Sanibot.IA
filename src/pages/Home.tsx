@@ -471,18 +471,148 @@ function bigCard(icon: string, title: string, path: string, bgColor: string, acc
       <div className="card-icon-wrapper">
         <span className="card-icon">{icon}</span>
       </div>
+
       <h3 className="card-title">{title}</h3>
+
     </div>
   );
 }
 
 /* --------------------------  MODO MOBILE  -------------------------- */
 function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, nextAppointment }: HomeProps) {
+  const [botMessage, setBotMessage] = useState<string | null>(null);
+  const [botOpen, setBotOpen] = useState(false);
+  const [botSpeaking, setBotSpeaking] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<Array<SpeechSynthesisVoice>>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>(() => {
+    try {
+      return localStorage.getItem("glucobot_home_voice") || "";
+    } catch {
+      // ignore
+      return "";
+    }
+  });
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const spanish = voices.filter((v) => v.lang?.toLowerCase().includes("es"));
+      setAvailableVoices(spanish.length ? spanish : voices);
+    };
+
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
+
+  const speak = (text: string) => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "es-ES";
+    utterance.rate = 1;
+    utterance.pitch = 1.1;
+
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = selectedVoiceName ? voices.find((v) => v.name === selectedVoiceName) : null;
+    const spanishVoice = voices.find((v) => v.lang?.toLowerCase().includes("es"));
+    if (preferred) utterance.voice = preferred;
+    else if (spanishVoice) utterance.voice = spanishVoice;
+
+    utterance.onstart = () => setBotSpeaking(true);
+    utterance.onend = () => setBotSpeaking(false);
+    utterance.onerror = () => setBotSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const buildBotMessage = () => {
+    const name = (patient?.nombre || "Paciente").split(" ")[0] || "Paciente";
+
+    const glucoseText = (() => {
+      const value = lastGlucose?.valor;
+      if (typeof value !== "number") return null;
+
+      if (value < 70) return `Tu última glicemia fue ${value} mg/dL. Está baja. Come algo con carbohidratos y vuelve a medir en 15 minutos.`;
+      if (value > 180) return `Tu última glicemia fue ${value} mg/dL. Está alta. Toma agua y revisa tu plan de insulina o indicaciones médicas.`;
+      return `Tu última glicemia fue ${value} mg/dL. ¡Buen control!`;
+    })();
+
+    const appointmentText = (() => {
+      if (!nextAppointment) return null;
+      const dateLabel = nextAppointment?.fecha ? new Date(nextAppointment.fecha).toLocaleDateString() : "";
+      const timeLabel = nextAppointment?.hora ? ` a las ${nextAppointment.hora}` : "";
+      const doctorLabel = nextAppointment?.doctor ? ` con ${nextAppointment.doctor}` : "";
+      return `Recuerda tu próxima cita el ${dateLabel}${timeLabel}${doctorLabel}.`;
+    })();
+
+    const parts = [glucoseText, appointmentText].filter(Boolean) as string[];
+    if (parts.length === 0) return `Hola ${name}. Presióname cuando quieras y te daré recomendaciones según tus registros.`;
+
+    return `Hola ${name}. ${parts.join(" ")}`;
+  };
+
+  const handleRobotPress = () => {
+    const text = buildBotMessage();
+    setBotMessage(text);
+    setBotOpen(true);
+
+    speak(text);
+  };
+
   return (
     <div className="mobile-container">
       {/* Hero Section */}
       <div className="mobile-hero">
-        <img src="/robot.png" alt="GlucoBot" className="mobile-robot" />
+        <button
+          type="button"
+          className="mobile-robot-button"
+          onClick={handleRobotPress}
+          aria-label="Abrir recomendaciones de SaniBot"
+        >
+          <img
+            src="/robot.png"
+            alt="GlucoBot"
+            className={`mobile-robot ${botSpeaking ? "mobile-robot-talking" : ""}`}
+          />
+        </button>
+
+        {botOpen && botMessage && (
+          <div className="mobile-robot-bubble" onClick={() => setBotOpen(false)}>
+            {botMessage}
+            <div className="mobile-robot-bubble-arrow" />
+          </div>
+        )}
+
+        {availableVoices.length > 0 && (
+          <div className="mobile-voice">
+            <label className="mobile-voice-label">Voz de GlucoBot</label>
+            <select
+              className="mobile-voice-select"
+              value={selectedVoiceName}
+              onChange={(e) => {
+                const next = e.target.value;
+                setSelectedVoiceName(next);
+                try {
+                  localStorage.setItem("glucobot_home_voice", next);
+                } catch {
+                  // ignore
+                }
+              }}
+            >
+              <option value="">Automática</option>
+              {availableVoices.map((v) => (
+                <option key={`${v.name}-${v.lang}`} value={v.name}>
+                  {v.name} ({v.lang})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <h1 className="mobile-greeting">
           {greeting}
           <br />
@@ -539,7 +669,6 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
         </button>
       </div>
 
-
       {/* Quick Actions */}
       <div className="mobile-cards">
         <div style={{ gridColumn: "1 / -1", display: "grid", gap: "15px" }}>
@@ -594,6 +723,78 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
           height: auto;
           margin-bottom: 20px;
           animation: float 3s ease-in-out infinite;
+        }
+
+        .mobile-robot-button {
+          background: transparent;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .mobile-robot-button:active .mobile-robot {
+          transform: scale(0.97);
+        }
+
+        .mobile-robot-talking {
+          animation: talk 0.35s ease-in-out infinite alternate;
+        }
+
+        .mobile-robot-bubble {
+          background: rgba(232, 240, 255, 0.98);
+          color: #0F172A;
+          padding: 12px 14px;
+          border-radius: 16px 16px 6px 16px;
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.10);
+          max-width: 320px;
+          margin: 0 auto 14px;
+          font-size: 14px;
+          line-height: 1.35;
+          position: relative;
+          cursor: pointer;
+        }
+
+        .mobile-robot-bubble-arrow {
+          position: absolute;
+          top: -6px;
+          left: 50%;
+          transform: translateX(-50%) rotate(45deg);
+          width: 12px;
+          height: 12px;
+          background: rgba(232, 240, 255, 0.98);
+          border-top: 1px solid rgba(99, 102, 241, 0.25);
+          border-left: 1px solid rgba(99, 102, 241, 0.25);
+        }
+
+        .mobile-voice {
+          display: grid;
+          gap: 6px;
+          max-width: 320px;
+          margin: 0 auto 14px;
+          text-align: left;
+        }
+
+        .mobile-voice-label {
+          font-size: 12px;
+          color: #64748B;
+          font-weight: 600;
+        }
+
+        .mobile-voice-select {
+          width: 100%;
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.10);
+          background: rgba(255, 255, 255, 0.9);
+          color: #0F172A;
+          font-size: 14px;
+          outline: none;
         }
 
         .mobile-greeting {
@@ -694,6 +895,11 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
           .mobile-card-title {
             font-size: 14px;
           }
+        }
+
+        @keyframes talk {
+          from { transform: translateY(0); }
+          to { transform: translateY(-6px); }
         }
       `}</style>
     </div >

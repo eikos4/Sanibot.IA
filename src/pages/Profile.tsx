@@ -57,142 +57,158 @@ export default function Profile() {
   }
 
   return (
-    <div style={{ paddingBottom: "80px" }}>
-      <h2 style={{ textAlign: "center" }}>Mi Perfil</h2>
+    <div className="profile-page">
+      <div className="profile-container">
+        <h2 className="profile-title">Mi Perfil</h2>
 
-      <div style={card}>
-        <div style={avatar}>{patient.nombre ? patient.nombre.charAt(0).toUpperCase() : "?"}</div>
-        <h3 style={{ margin: "10px 0 5px" }}>{patient.nombre}</h3>
-        <p style={{ color: "#666", margin: 0 }}>{patient.rut}</p>
-      </div>
-
-      <div style={section}>
-        <h4 style={sectionTitle}>Datos Personales</h4>
-        <div style={row}>
-          <span>RUT:</span> <strong>{patient.rut}</strong>
-        </div>
-        <div style={row}>
-          <span>Nacimiento:</span> <strong>{patient.fechaNacimiento}</strong>
-        </div>
-        <div style={row}>
-          <span>Género:</span> <strong>{patient.genero}</strong>
-        </div>
-        <div style={row}>
-          <span>Previsión:</span> <strong style={{ color: "#1F4FFF" }}>{patient.prevision}</strong>
-        </div>
-      </div>
-
-      <div style={section}>
-        <h4 style={sectionTitle}>Ficha Clínica</h4>
-        <div style={row}>
-          <span>Diabetes:</span> <strong style={{ color: "#EF4444" }}>{patient.tipoDiabetes}</strong>
-        </div>
-        <div style={row}>
-          <span>Diagnóstico:</span> <strong>{patient.anioDiagnostico}</strong>
+        <div style={card}>
+          <div style={avatar}>{patient.nombre ? patient.nombre.charAt(0).toUpperCase() : "?"}</div>
+          <h3 style={{ margin: "10px 0 5px" }}>{patient.nombre}</h3>
+          <p style={{ color: "#666", margin: 0, wordBreak: "break-word" }}>{patient.rut}</p>
         </div>
 
-        <div style={{ marginTop: "10px", padding: "10px", background: "#F3F4F6", borderRadius: "8px" }}>
-          <p style={{ margin: "0 0 5px", fontSize: "13px", fontWeight: "600" }}>Antecedentes / Comorbilidades:</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-            {patient.hipertension && <span style={tag}>Hipertensión</span>}
-            {patient.hipotiroidismo && <span style={tag}>Hipotiroidismo</span>}
-            {patient.dislipidemia && <span style={tag}>Dislipidemia</span>}
-            {patient.renal && <span style={tag}>Enf. Renal</span>}
-            {patient.antecedentesFamiliares && <span style={tag}>Ant. Familiares</span>}
-            {!patient.hipertension && !patient.hipotiroidismo && !patient.dislipidemia && !patient.renal && <span style={{ fontSize: "13px", color: "#666" }}>Sin otros antecedentes reportados.</span>}
-          </div>
-        </div>
-      </div>
-
-      <div style={section}>
-        <h4 style={sectionTitle}>Estilo de Vida</h4>
-        <div style={row}>
-          <span>Peso / Altura:</span> <strong>{patient.peso}kg / {patient.altura}cm</strong>
-        </div>
-        <div style={row}>
-          <span>Actividad:</span> <strong>{patient.actividadFisica}</strong>
-        </div>
-        <div style={row}>
-          <span>Fumador:</span> <strong>{patient.fumador ? "Sí 🚬" : "No"}</strong>
-        </div>
-      </div>
-
-      <div style={section}>
-        <h4 style={sectionTitle}>Contacto de Emergencia 🆘</h4>
-        <div style={row}>
-          <span>Nombre:</span> <strong>{patient.emergenciaNombre} ({patient.emergenciaRelacion})</strong>
-        </div>
-        <div style={row}>
-          <span>Teléfono:</span>
-          <a href={`tel:${patient.emergenciaTelefono}`} style={{ color: "#1F4FFF", fontWeight: "bold", textDecoration: "none" }}>
-            {patient.emergenciaTelefono}
-          </a>
-        </div>
-      </div>
-
-      <button
-        style={btn}
-        onClick={() => alert("Función de editar en construcción")}
-      >
-        Editar Perfil
-      </button>
-
-      <button
-        style={{ ...btn, background: "#EF4444", marginTop: "15px" }}
-        onClick={handleDeleteAccount}
-      >
-        Eliminar Cuenta
-      </button>
-
-      {/* CALCULADORA IMC */}
-      <BMICalculator />
-
-      {/* RESUMEN DE SALUD / BIENESTAR */}
-      <div style={{ marginTop: "30px" }}>
-        <h3 style={{ fontSize: "20px", marginBottom: "15px" }}>Resumen de Bienestar 🌟</h3>
-
-        {/* Próximas Medicinas */}
         <div style={section}>
-          <h4 style={sectionTitle}>💊 Mis Medicamentos</h4>
-          {(() => {
-            if (medicines.length === 0) return <p style={{ color: "#666" }}>No hay medicamentos registrados.</p>;
-            return medicines.slice(0, 2).map((m: any, i: number) => (
-              <div key={i} style={row}>
-                <span>{m.nombre}</span>
-                <strong>{m.horario ? m.horario : (m.horarios && m.horarios[0]) || ""}</strong>
-              </div>
-            ));
-          })()}
-          <div style={{ textAlign: "right", marginTop: "10px" }}>
-            <a href="/medicines" style={{ fontSize: "14px", color: "#3B82F6" }}>Ver todos →</a>
+          <h4 style={sectionTitle}>Datos Personales</h4>
+          <div className="profile-row" style={row}>
+            <span>RUT:</span> <strong>{patient.rut}</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Nacimiento:</span> <strong>{patient.fechaNacimiento}</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Género:</span> <strong>{patient.genero}</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Previsión:</span> <strong style={{ color: "#1F4FFF" }}>{patient.prevision}</strong>
           </div>
         </div>
 
-        {/* Próxima Cita */}
         <div style={section}>
-          <h4 style={sectionTitle}>📅 Próxima Visita Médica</h4>
-          {(() => {
-            if (appointments.length === 0) return <p style={{ color: "#666" }}>No hay citas agendadas.</p>;
-            // Encontrar próxima
-            const next = appointments.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-              .find((a: any) => new Date(`${a.fecha}T23:59`) >= new Date());
+          <h4 style={sectionTitle}>Ficha Clínica</h4>
+          <div className="profile-row" style={row}>
+            <span>Diabetes:</span> <strong style={{ color: "#EF4444" }}>{patient.tipoDiabetes}</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Diagnóstico:</span> <strong>{patient.anioDiagnostico}</strong>
+          </div>
 
-            if (!next) return <p style={{ color: "#666" }}>No tienes citas futuras.</p>;
+          <div style={{ marginTop: "10px", padding: "10px", background: "#F3F4F6", borderRadius: "8px" }}>
+            <p style={{ margin: "0 0 5px", fontSize: "13px", fontWeight: "600" }}>Antecedentes / Comorbilidades:</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+              {patient.hipertension && <span style={tag}>Hipertensión</span>}
+              {patient.hipotiroidismo && <span style={tag}>Hipotiroidismo</span>}
+              {patient.dislipidemia && <span style={tag}>Dislipidemia</span>}
+              {patient.renal && <span style={tag}>Enf. Renal</span>}
+              {patient.antecedentesFamiliares && <span style={tag}>Ant. Familiares</span>}
+              {!patient.hipertension && !patient.hipotiroidismo && !patient.dislipidemia && !patient.renal && <span style={{ fontSize: "13px", color: "#666" }}>Sin otros antecedentes reportados.</span>}
+            </div>
+          </div>
+        </div>
 
-            return (
-              <div>
-                <div style={row}>
-                  <span>Dr. {next.doctor}</span>
-                  <strong>{new Date(next.fecha).toLocaleDateString()}</strong>
+        <div style={section}>
+          <h4 style={sectionTitle}>Estilo de Vida</h4>
+          <div className="profile-row" style={row}>
+            <span>Peso / Altura:</span> <strong>{patient.peso}kg / {patient.altura}cm</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Actividad:</span> <strong>{patient.actividadFisica}</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Fumador:</span> <strong>{patient.fumador ? "Sí 🚬" : "No"}</strong>
+          </div>
+        </div>
+
+        <div style={section}>
+          <h4 style={sectionTitle}>Contacto de Emergencia 🆘</h4>
+          <div className="profile-row" style={row}>
+            <span>Nombre:</span> <strong>{patient.emergenciaNombre} ({patient.emergenciaRelacion})</strong>
+          </div>
+          <div className="profile-row" style={row}>
+            <span>Teléfono:</span>
+            <a href={`tel:${patient.emergenciaTelefono}`} style={{ color: "#1F4FFF", fontWeight: "bold", textDecoration: "none", wordBreak: "break-word" }}>
+              {patient.emergenciaTelefono}
+            </a>
+          </div>
+        </div>
+
+        <div className="profile-actions">
+          <button
+            style={btn}
+            onClick={() => alert("Función de editar en construcción")}
+          >
+            Editar Perfil
+          </button>
+
+          <button
+            style={{ ...btn, background: "#EF4444" }}
+            onClick={handleDeleteAccount}
+          >
+            Eliminar Cuenta
+          </button>
+        </div>
+
+        <BMICalculator />
+
+        <div style={{ marginTop: "30px" }}>
+          <h3 style={{ fontSize: "20px", marginBottom: "15px" }}>Resumen de Bienestar 🌟</h3>
+
+          <div style={section}>
+            <h4 style={sectionTitle}>💊 Mis Medicamentos</h4>
+            {(() => {
+              if (medicines.length === 0) return <p style={{ color: "#666" }}>No hay medicamentos registrados.</p>;
+              return medicines.slice(0, 2).map((m: any, i: number) => (
+                <div key={i} className="profile-row" style={row}>
+                  <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{m.nombre}</span>
+                  <strong style={{ overflowWrap: "anywhere" }}>{m.horario ? m.horario : (m.horarios && m.horarios[0]) || ""}</strong>
                 </div>
-                <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#666" }}>{next.motivo}</p>
-              </div>
-            );
-          })()}
-          <div style={{ textAlign: "right", marginTop: "10px" }}>
-            <a href="/appointments" style={{ fontSize: "14px", color: "#3B82F6" }}>Gestionar citas →</a>
+              ));
+            })()}
+            <div style={{ textAlign: "right", marginTop: "10px" }}>
+              <a href="/medicines" style={{ fontSize: "14px", color: "#3B82F6" }}>Ver todos →</a>
+            </div>
+          </div>
+
+          <div style={section}>
+            <h4 style={sectionTitle}>📅 Próxima Visita Médica</h4>
+            {(() => {
+              if (appointments.length === 0) return <p style={{ color: "#666" }}>No hay citas agendadas.</p>;
+              // Encontrar próxima
+              const next = appointments.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+                .find((a: any) => new Date(`${a.fecha}T23:59`) >= new Date());
+
+              if (!next) return <p style={{ color: "#666" }}>No tienes citas futuras.</p>;
+
+              return (
+                <div>
+                  <div className="profile-row" style={row}>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>Dr. {next.doctor}</span>
+                    <strong>{new Date(next.fecha).toLocaleDateString()}</strong>
+                  </div>
+                  <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#666", overflowWrap: "anywhere" }}>{next.motivo}</p>
+                </div>
+              );
+            })()}
+            <div style={{ textAlign: "right", marginTop: "10px" }}>
+              <a href="/appointments" style={{ fontSize: "14px", color: "#3B82F6" }}>Gestionar citas →</a>
+            </div>
           </div>
         </div>
+
+        <style>{`
+          .profile-page { padding-bottom: 80px; }
+          .profile-container { max-width: 920px; margin: 0 auto; padding: 16px 16px 0; }
+          .profile-title { text-align: center; margin: 8px 0 16px; }
+          .profile-actions { display: grid; gap: 12px; margin-top: 8px; }
+          .profile-row { gap: 12px; align-items: baseline; }
+          .profile-row span { color: #374151; }
+          .profile-row strong { text-align: right; }
+
+          @media (max-width: 520px) {
+            .profile-container { padding-left: 12px; padding-right: 12px; }
+            .profile-row { flex-direction: column; align-items: flex-start; }
+            .profile-row strong { text-align: left; }
+          }
+        `}</style>
       </div>
     </div>
   );
