@@ -81,9 +81,15 @@ export const getPatientData = async (): Promise<Partial<PatientData> | null> => 
     const snapshot = await getDoc(userRef);
     if (snapshot.exists()) {
       const cloudData = snapshot.data() as PatientData;
-      // Update local storage with fresh data
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData));
-      return cloudData;
+      // Merge with local cache so we don't lose flags (e.g. profileCompleted) when cloud is stale.
+      const merged = {
+        ...(localData || {}),
+        ...(cloudData || {}),
+        profileCompleted:
+          (cloudData as any)?.profileCompleted === true || (localData as any)?.profileCompleted === true ? true : undefined,
+      };
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(merged));
+      return merged;
     }
   } catch (error) {
     console.error("Error getting patient data from cloud, using local:", error);

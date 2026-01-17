@@ -483,29 +483,7 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
   const [botMessage, setBotMessage] = useState<string | null>(null);
   const [botOpen, setBotOpen] = useState(false);
   const [botSpeaking, setBotSpeaking] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<Array<SpeechSynthesisVoice>>([]);
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string>(() => {
-    try {
-      return localStorage.getItem("glucobot_home_voice") || "";
-    } catch {
-      // ignore
-      return "";
-    }
-  });
-
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const spanish = voices.filter((v) => v.lang?.toLowerCase().includes("es"));
-      setAvailableVoices(spanish.length ? spanish : voices);
-    };
-
-    loadVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-  }, []);
+  const fixedVoiceName = "Google español";
 
   const speak = (text: string) => {
     if (!("speechSynthesis" in window)) return;
@@ -517,7 +495,7 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
     utterance.pitch = 1.1;
 
     const voices = window.speechSynthesis.getVoices();
-    const preferred = selectedVoiceName ? voices.find((v) => v.name === selectedVoiceName) : null;
+    const preferred = voices.find((v) => v.name === fixedVoiceName);
     const spanishVoice = voices.find((v) => v.lang?.toLowerCase().includes("es"));
     if (preferred) utterance.voice = preferred;
     else if (spanishVoice) utterance.voice = spanishVoice;
@@ -584,32 +562,6 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
           <div className="mobile-robot-bubble" onClick={() => setBotOpen(false)}>
             {botMessage}
             <div className="mobile-robot-bubble-arrow" />
-          </div>
-        )}
-
-        {availableVoices.length > 0 && (
-          <div className="mobile-voice">
-            <label className="mobile-voice-label">Voz de GlucoBot</label>
-            <select
-              className="mobile-voice-select"
-              value={selectedVoiceName}
-              onChange={(e) => {
-                const next = e.target.value;
-                setSelectedVoiceName(next);
-                try {
-                  localStorage.setItem("glucobot_home_voice", next);
-                } catch {
-                  // ignore
-                }
-              }}
-            >
-              <option value="">Automática</option>
-              {availableVoices.map((v) => (
-                <option key={`${v.name}-${v.lang}`} value={v.name}>
-                  {v.name} ({v.lang})
-                </option>
-              ))}
-            </select>
           </div>
         )}
 

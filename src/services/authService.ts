@@ -278,6 +278,17 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
                 const localPatientData = rawPatientData ? JSON.parse(rawPatientData) : null;
                 if (localPatientData?.profileCompleted === true) {
                     user.profileCompleted = true;
+
+                    // Best-effort: ensure Firestore also has the completion flag so redirects don't regress.
+                    try {
+                        await setDoc(
+                            doc(db, "users", firebaseUser.uid),
+                            { profileCompleted: true },
+                            { merge: true }
+                        );
+                    } catch (e) {
+                        console.warn("Could not persist profileCompleted to Firestore:", e);
+                    }
                 }
             } catch {
                 // ignore

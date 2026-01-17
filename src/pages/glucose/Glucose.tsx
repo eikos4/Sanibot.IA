@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import SimulatedCall from "../../components/SimulatedCall";
 
 // @ts-ignore
@@ -146,7 +147,9 @@ Sigue así.`
 // ============ MAIN COMPONENT ============
 
 export default function Glucose() {
+  const navigate = useNavigate();
   const [value, setValue] = useState("");
+  const [context, setContext] = useState<"ayunas" | "pre" | "post" | "antes_dormir">("ayunas");
   const [callData, setCallData] = useState<{ active: boolean; message: string; title: string; speech: string } | null>(null);
   const [userName, setUserName] = useState("Paciente");
   const [history, setHistory] = useState<any[]>([]);
@@ -183,11 +186,20 @@ export default function Glucose() {
     setIsLoading(true);
     console.log("Saving glucose:", val);
 
+    const contextLabel =
+      context === "ayunas"
+        ? "Ayunas"
+        : context === "pre"
+          ? "Antes de comer"
+          : context === "post"
+            ? "2h después de comer"
+            : "Antes de dormir";
+
     const record = {
-      fecha: new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+      fecha: new Date().toISOString().slice(0, 10),
       valor: val,
       hora: new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-      comida: "Registrado desde Panel",
+      comida: contextLabel,
     };
 
     try {
@@ -288,6 +300,24 @@ export default function Glucose() {
         {getTrendBadge()}
       </p>
 
+      <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => navigate("/glucose/history")}
+          style={{
+            padding: "10px 14px",
+            borderRadius: "14px",
+            border: "1px solid rgba(15, 23, 42, 0.12)",
+            background: "rgba(255,255,255,0.9)",
+            fontWeight: 800,
+            color: "#0F172A",
+            cursor: "pointer",
+          }}
+        >
+          📚 Ver historial completo
+        </button>
+      </div>
+
       {/* MAIN CARD */}
       <div style={mainCard}>
         <span style={{ fontSize: "50px", display: "block", marginBottom: "5px" }}>🩸</span>
@@ -312,6 +342,31 @@ export default function Glucose() {
           fontSize: "14px"
         }}>
           {getStatusText(Number(value))}
+        </div>
+
+        <div style={{ marginTop: "14px", width: "100%" }}>
+          <label style={{ fontWeight: "bold", color: "#666", display: "block", marginBottom: "6px" }}>
+            Contexto de la medición
+          </label>
+          <select
+            value={context}
+            onChange={(e) => setContext(e.target.value as any)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: "14px",
+              border: "1px solid rgba(15, 23, 42, 0.12)",
+              background: "rgba(255,255,255,0.9)",
+              fontWeight: 700,
+              color: "#0F172A",
+              outline: "none",
+            }}
+          >
+            <option value="ayunas">Ayunas</option>
+            <option value="pre">Antes de comer</option>
+            <option value="post">2h después de comer</option>
+            <option value="antes_dormir">Antes de dormir</option>
+          </select>
         </div>
       </div>
 

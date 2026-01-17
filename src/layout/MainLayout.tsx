@@ -10,6 +10,17 @@ export default function MainLayout() {
   const location = useLocation();
   const hideNavRoutes = ["/", "/welcome", "/register"];
   const shouldHideNav = hideNavRoutes.includes(location.pathname);
+  const isHomeRoute = location.pathname === "/home";
+
+  const [isSaniBotEnabled, setIsSaniBotEnabled] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("glucobot_floating_sanibot_enabled");
+      if (raw === null) return true;
+      return raw === "true";
+    } catch {
+      return true;
+    }
+  });
 
   const [isDesktop, setIsDesktop] = useState(false);
   const [callActive, setCallActive] = useState(false);
@@ -137,6 +148,39 @@ export default function MainLayout() {
         background: "#FFFFFF",
       }}
     >
+      {isHomeRoute && !shouldHideNav && (
+        <button
+          type="button"
+          onClick={() => {
+            const next = !isSaniBotEnabled;
+            setIsSaniBotEnabled(next);
+            try {
+              localStorage.setItem("glucobot_floating_sanibot_enabled", String(next));
+            } catch {
+              // ignore
+            }
+          }}
+          aria-label={isSaniBotEnabled ? "Desactivar SaniBot flotante" : "Activar SaniBot flotante"}
+          style={{
+            position: "fixed",
+            top: 12,
+            right: 12,
+            zIndex: 9999,
+            border: "1px solid rgba(15, 23, 42, 0.12)",
+            borderRadius: 999,
+            padding: "8px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: "rgba(255,255,255,0.95)",
+            color: "#0F172A",
+            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.10)",
+            cursor: "pointer",
+          }}
+        >
+          {isSaniBotEnabled ? "🤖 SaniBot: ON" : "🤖 SaniBot: OFF"}
+        </button>
+      )}
+
       {callActive && (
         <SimulatedCall
           userName={callerName}
@@ -171,7 +215,7 @@ export default function MainLayout() {
       )}
 
       {/* 🤖 SANIBOT FLOTANTE (SIEMPRE VISIBLE) */}
-      <SaniBot />
+      {!shouldHideNav && isSaniBotEnabled && <SaniBot />}
 
       {/* 🔻 NAV SOLO EN MOBILE */}
       {/* The BottomNav is now rendered inside the mobile div, so this line is removed */}
