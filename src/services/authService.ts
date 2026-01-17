@@ -272,6 +272,29 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
                 role: "patient"
             };
 
+            // If Firestore has patient profile fields but profileCompleted is missing, infer completion.
+            try {
+                const p: any = profile || null;
+                const looksLikeOnboardingDone =
+                    p &&
+                    (p.rut || p.fechaNacimiento || p.tipoDiabetes || p.prevision || p.peso || p.altura || p.emergenciaTelefono);
+
+                if (looksLikeOnboardingDone && user.profileCompleted !== true) {
+                    user.profileCompleted = true;
+                    try {
+                        await setDoc(
+                            doc(db, "users", firebaseUser.uid),
+                            { profileCompleted: true },
+                            { merge: true }
+                        );
+                    } catch (e) {
+                        console.warn("Could not persist inferred profileCompleted to Firestore:", e);
+                    }
+                }
+            } catch {
+                // ignore
+            }
+
             // If onboarding data exists locally, keep the completion flag even if Firestore profile is stale.
             try {
                 const rawPatientData = localStorage.getItem("glucobot_patient_data");

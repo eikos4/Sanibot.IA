@@ -25,6 +25,7 @@ import AppAppointments from "../pages/appointments/Appointments";
 import AddAppointment from "../pages/appointments/AddAppointment";
 import Profile from "../pages/Profile";
 import Robot from "../pages/Robot";
+import Wellbeing from "../pages/Wellbeing";
 import DailyLog from "../pages/DailyLog";
 import WeightControl from "../pages/WeightControl";
 import InsulinControl from "../pages/insulin/InsulinControl";
@@ -102,6 +103,7 @@ export default function AppRouter() {
             {/* Perfil + Robot + Bitácora */}
             <Route path="/profile" element={<Profile />} />
             <Route path="/robot" element={<Robot />} />
+            <Route path="/wellbeing" element={<Wellbeing />} />
             <Route path="/daily-log" element={<DailyLog />} />
 
             {/* Cuidador */}

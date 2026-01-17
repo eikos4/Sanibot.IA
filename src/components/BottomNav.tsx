@@ -9,6 +9,7 @@ export default function BottomNav() {
     { path: "/medicines", label: "Medicinas", icon: "💊" },
     { path: "/glucose", label: "Glicemia", icon: "🩸" },
     { path: "/robot", label: "GlucoBot", icon: "🤖" },
+    { path: "/wellbeing", label: "Bienestar", icon: "🧠" },
     { path: "/profile", label: "Perfil", icon: "👤" },
   ];
 

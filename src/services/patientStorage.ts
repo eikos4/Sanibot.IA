@@ -44,7 +44,7 @@ export interface PatientData {
 const LOCAL_KEY = "glucobot_patient_data";
 
 // Helper for timeout
-const timeoutPromise = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms));
+const timeoutPromise = (ms: number) => new Promise((resolve) => setTimeout(() => resolve("timeout"), ms));
 
 // Save (Merge) patient data into the user's document
 export const savePatientData = async (data: Partial<PatientData>) => {
@@ -59,9 +59,13 @@ export const savePatientData = async (data: Partial<PatientData>) => {
 
   try {
     const userRef = doc(db, "users", user.uid);
-    // Race between Firestore and 3s timeout
+    const writePromise = setDoc(userRef, { ...data, profileCompleted: true }, { merge: true }).catch((error) => {
+      console.warn("Error saving patient data to Firestore (saved locally):", error);
+    });
+
+    // Race between Firestore and 3s timeout (write continues in background if timeout wins)
     await Promise.race([
-      setDoc(userRef, { ...data, profileCompleted: true }, { merge: true }),
+      writePromise,
       timeoutPromise(3000)
     ]);
   } catch (error) {
