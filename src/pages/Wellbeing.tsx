@@ -149,7 +149,7 @@ export default function Wellbeing() {
         },
       ]);
       speak(reply);
-    } catch (e) {
+    } catch {
       setIsTyping(false);
       setError("No pude conectar con el asistente. Intenta nuevamente.");
     }

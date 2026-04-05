@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card } from "./ui/Card";
 
+// Obtener clave diaria: "hydration_YYYY-MM-DD"
+const getTodayKey = () => `hydration_${new Date().toDateString()}`;
+
 export default function HydrationWidget() {
     const totalGlasses = 8;
     const [count, setCount] = useState(0);
-
-    // Obtener clave diaria: "hydration_YYYY-MM-DD"
-    const getTodayKey = () => `hydration_${new Date().toDateString()}`;
 
     useEffect(() => {
         const saved = localStorage.getItem(getTodayKey());

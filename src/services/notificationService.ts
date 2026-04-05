@@ -12,7 +12,14 @@ export class NotificationService {
         // And assumes daily recurrence.
 
         const times = medicine.horario.split(',').map(t => t.trim());
-        const notifications: any[] = [];
+        const notifications: Array<{
+            title: string;
+            body: string;
+            id: number;
+            schedule: { on: { hour: number; minute: number }; allowWhileIdle: boolean };
+            actionTypeId: string;
+            extra: { medicineId: string };
+        }> = [];
 
         times.forEach((time, index) => {
             const [hours, minutes] = time.split(':').map(Number);

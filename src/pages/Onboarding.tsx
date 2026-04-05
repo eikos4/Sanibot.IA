@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { savePatientData } from "../services/patientStorage";
+import { getPatientDataByUid, savePatientData } from "../services/patientStorage";
 import type { PatientData } from "../services/patientStorage";
 import NeuralBackground from "../components/NeuralBackground";
 import StepIndicator from "../components/StepIndicator";
@@ -10,6 +10,41 @@ export default function Onboarding() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
+    const [isVerifying, setIsVerifying] = useState(true);
+
+    useEffect(() => {
+        if (user?.profileCompleted === true) {
+            navigate("/home", { replace: true });
+        }
+    }, [user?.profileCompleted, navigate]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const run = async () => {
+            if (!user?.id) {
+                setIsVerifying(false);
+                return;
+            }
+            try {
+                const data = await getPatientDataByUid(user.id);
+                const completed = (data as any)?.profileCompleted === true;
+                if (!cancelled && completed) {
+                    navigate("/home", { replace: true });
+                    return;
+                }
+            } catch {
+                // ignore
+            } finally {
+                if (!cancelled) setIsVerifying(false);
+            }
+        };
+
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id, navigate]);
 
     // Initial State consistent with PatientData
     const [form, setForm] = useState<Partial<PatientData>>({
@@ -76,7 +111,7 @@ export default function Onboarding() {
         }
     };
 
-    if (!user) return <div style={{ padding: 20 }}>Cargando sesión...</div>;
+    if (!user || isVerifying) return <div style={{ padding: 20 }}>Cargando sesión...</div>;
 
     const renderStep1 = () => (
         <>

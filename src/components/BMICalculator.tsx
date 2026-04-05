@@ -8,20 +8,6 @@ export default function BMICalculator() {
     const [bmi, setBmi] = useState<number | null>(null);
     const [status, setStatus] = useState({ label: "", color: "" });
 
-    useEffect(() => {
-        const loadLast = async () => {
-            const history = await getWeightHistory();
-            if (history.length > 0) {
-                // history is stored in desc order per my query
-                const last = history[0];
-                setWeight(last.weight.toString());
-                setHeight(last.height.toString());
-                calculate(last.weight.toString(), last.height.toString());
-            }
-        };
-        loadLast();
-    }, []);
-
     const calculate = (wStr: string, hStr: string) => {
         const w = parseFloat(wStr);
         const h = parseFloat(hStr);
@@ -40,6 +26,19 @@ export default function BMICalculator() {
             setStatus({ label: "", color: "" });
         }
     };
+
+    useEffect(() => {
+        const loadLast = async () => {
+            const history = await getWeightHistory();
+            if (history.length > 0) {
+                const last = history[0];
+                setWeight(last.weight.toString());
+                setHeight(last.height.toString());
+                calculate(last.weight.toString(), last.height.toString());
+            }
+        };
+        loadLast();
+    }, []);
 
     const handleSave = async () => {
         await saveWeightEntry(parseFloat(weight), parseFloat(height), bmi || 0);

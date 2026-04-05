@@ -49,8 +49,8 @@ const getProfile = async (uid: string): Promise<User | null> => {
             if (docSnap.exists()) {
                 return { id: uid, ...docSnap.data() } as User;
             }
-        } catch (e: any) {
-            console.warn("Firestore getProfile failed:", e.message || e);
+        } catch (e: unknown) {
+            console.warn("Firestore getProfile failed:", e instanceof Error ? e.message : e);
         }
         return null;
     })();
@@ -65,8 +65,8 @@ const saveProfileAsync = async (uid: string, profileData: Omit<User, 'id'>): Pro
         localStorage.removeItem(PENDING_PROFILE_KEY);
         console.log("Profile saved to Firestore");
         return true;
-    } catch (e: any) {
-        console.warn("Firestore saveProfile failed, saving locally:", e.message);
+    } catch (e: unknown) {
+        console.warn("Firestore saveProfile failed, saving locally:", e instanceof Error ? e.message : e);
         localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify({ uid, ...profileData }));
         return false;
     }
@@ -115,7 +115,7 @@ export const loginWithGoogle = async (): Promise<{ user: User | null; error?: st
 
         return { user };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Google Sign-In error:", error);
 
         const errorMessages: Record<string, string> = {
@@ -126,7 +126,8 @@ export const loginWithGoogle = async (): Promise<{ user: User | null; error?: st
             "auth/network-request-failed": "Error de red. Verifica tu conexión a internet."
         };
 
-        const errorMsg = errorMessages[error.code] || "Hubo un problema al iniciar sesión con Google.";
+        const code = (error as { code?: string })?.code || "";
+        const errorMsg = errorMessages[code] || "Hubo un problema al iniciar sesión con Google.";
         return { user: null, error: errorMsg };
     }
 };
@@ -156,7 +157,7 @@ export const login = async (username: string, password: string): Promise<{ user:
 
         return { user };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Login error:", error);
 
         const errorMessages: Record<string, string> = {
@@ -169,12 +170,13 @@ export const login = async (username: string, password: string): Promise<{ user:
             "auth/network-request-failed": "Error de red. Verifica tu conexión."
         };
 
-        const errorMsg = errorMessages[error.code] || "Error al iniciar sesión.";
+        const code = (error as { code?: string })?.code || "";
+        const errorMsg = errorMessages[code] || "Error al iniciar sesión";
         return { user: null, error: errorMsg };
     }
 };
 
-const getAuthErrorMessage = (error: any): string => {
+const getAuthErrorMessage = (error: unknown): string => {
     const messages: Record<string, string> = {
         "auth/email-already-in-use": "Este correo ya tiene una cuenta. Intenta iniciar sesión.",
         "auth/invalid-email": "El formato del correo es inválido.",
@@ -182,7 +184,8 @@ const getAuthErrorMessage = (error: any): string => {
         "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
         "auth/network-request-failed": "Error de red. Verifica tu conexión."
     };
-    return messages[error.code] || "Error al crear la cuenta. Intenta de nuevo.";
+    const code = (error as { code?: string })?.code || "";
+    return messages[code] || "Error al crear la cuenta. Intenta de nuevo.";
 };
 
 export const register = async (
@@ -221,7 +224,7 @@ export const register = async (
 
         return { success: true, user: newUser };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Registration error:", error);
         return { success: false, error: getAuthErrorMessage(error) };
     }
@@ -274,7 +277,7 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
 
             // If Firestore has patient profile fields but profileCompleted is missing, infer completion.
             try {
-                const p: any = profile || null;
+                const p = profile as (User & Record<string, unknown>) | null;
                 const looksLikeOnboardingDone =
                     p &&
                     (p.rut || p.fechaNacimiento || p.tipoDiabetes || p.prevision || p.peso || p.altura || p.emergenciaTelefono);
@@ -397,9 +400,10 @@ export const deleteAccount = async (): Promise<boolean> => {
         localStorage.removeItem("glucobot_smoking_cravings");
 
         return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Delete account error:", error);
-        if (error.code === "auth/requires-recent-login") {
+        const code = (error as { code?: string })?.code;
+        if (code === "auth/requires-recent-login") {
             throw new Error("Necesitas volver a iniciar sesión para eliminar tu cuenta.");
         }
         return false;

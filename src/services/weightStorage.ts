@@ -55,7 +55,7 @@ const getLocalHistory = (): WeightEntry[] => {
     try {
         const local = localStorage.getItem(LOCAL_KEY);
         return local ? JSON.parse(local) : [];
-    } catch (e) {
+    } catch {
         return [];
     }
 };

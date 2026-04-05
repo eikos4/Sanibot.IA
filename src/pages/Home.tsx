@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getPatientData } from "../services/patientStorage";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 
 // @ts-ignore
@@ -26,6 +27,7 @@ interface HomeProps {
 }
 
 export default function Home() {
+  const { user: authUser } = useAuth();
   const [patient, setPatient] = useState<User | null>(null);
   const [greeting, setGreeting] = useState("¡Hola!");
   const [isDesktop, setIsDesktop] = useState(false);
@@ -65,10 +67,13 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkDesktop);
   }, []);
 
+  // Merge: use auth display name as fallback while patient data loads
+  const effectivePatient: User | null = patient || (authUser?.name ? { nombre: authUser.name } : null);
+
   return isDesktop ? (
     <HomeDesktop
       greeting={greeting}
-      patient={patient}
+      patient={effectivePatient}
       navigate={navigate}
       lastGlucose={lastGlucose}
       glucoseHistory={glucoseHistory}
@@ -77,7 +82,7 @@ export default function Home() {
   ) : (
     <HomeMobile
       greeting={greeting}
-      patient={patient}
+      patient={effectivePatient}
       navigate={navigate}
       lastGlucose={lastGlucose}
       glucoseHistory={glucoseHistory}

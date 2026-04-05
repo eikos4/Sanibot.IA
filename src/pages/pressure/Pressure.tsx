@@ -1,24 +1,30 @@
 import { useState, useEffect } from "react";
-// @ts-ignore
 import SimulatedCall from "../../components/SimulatedCall";
+
+interface PressureRecord {
+    fecha: string;
+    sistolica: number;
+    diastolica: number;
+    timestamp: number;
+}
 
 export default function Pressure() {
     const [systolic, setSystolic] = useState("");
     const [diastolic, setDiastolic] = useState("");
     const [callData, setCallData] = useState<{ active: boolean; message: string; title: string } | null>(null);
     const [userName, setUserName] = useState("Paciente");
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<PressureRecord[]>([]);
+
+    const loadHistory = () => {
+        const data = JSON.parse(localStorage.getItem("pressureHistory") || "[]");
+        setHistory(data);
+    };
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem("glucobot_current_user") || "{}");
         if (user.name) setUserName(user.name);
         loadHistory();
     }, []);
-
-    const loadHistory = () => {
-        const data = JSON.parse(localStorage.getItem("pressureHistory") || "[]");
-        setHistory(data);
-    };
 
     const save = () => {
         if (!systolic || !diastolic) return alert("Ingresa ambos valores");
@@ -160,7 +166,7 @@ export default function Pressure() {
                     <p style={{ color: "#999", fontStyle: "italic" }}>No hay mediciones recientes.</p>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        {[...history].reverse().slice(0, 3).map((item: any, i: number) => (
+                        {[...history].reverse().slice(0, 3).map((item: PressureRecord, i: number) => (
                             <div key={i} style={historyItem}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                     <span style={{ fontWeight: "800", fontSize: "18px", color: "#3B82F6" }}>
@@ -183,7 +189,7 @@ export default function Pressure() {
 }
 
 // --- CHART COMPONENT ---
-const PressureChart = ({ data }: { data: any[] }) => {
+const PressureChart = ({ data }: { data: PressureRecord[] }) => {
     const recentData = data.slice(-7);
 
     if (recentData.length < 2) {

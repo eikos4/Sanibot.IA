@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { getRandomTip } from "../data/healthTips";
 
@@ -28,18 +28,19 @@ export default function SaniBot({ message: initialMessage, initialOpen = true }:
     }, []);
 
     // Mensajes contextuales
-    useEffect(() => {
+    const contextualMessage = useMemo(() => {
         const path = location.pathname;
-        let msg = "¡Hola! Soy SaniBot 🤖 Estoy aquí para ayudarte.";
-
-        if (path.includes("/home")) msg = "¡Hola! Aquí tienes tu resumen de hoy. 🌞";
-        else if (path.includes("/medicines")) msg = "Aquí puedes gestionar tus medicamentos. 💊";
-        else if (path.includes("/glucose")) msg = "Registra tu glucosa para llevar un buen control. 🩸";
-        else if (path.includes("/appointments")) msg = "No olvides agendar tus próximas visitas. 📅";
-        else if (path.includes("/food")) msg = "Una buena alimentación es clave. 🥗";
-
-        setMessage(msg);
+        if (path.includes("/home")) return "¡Hola! Aquí tienes tu resumen de hoy. 🌞";
+        if (path.includes("/medicines")) return "Aquí puedes gestionar tus medicamentos. 💊";
+        if (path.includes("/glucose")) return "Registra tu glucosa para llevar un buen control. 🩸";
+        if (path.includes("/appointments")) return "No olvides agendar tus próximas visitas. 📅";
+        if (path.includes("/food")) return "Una buena alimentación es clave. 🥗";
+        return "¡Hola! Soy SaniBot 🤖 Estoy aquí para ayudarte.";
     }, [location.pathname]);
+
+    useEffect(() => {
+        setMessage(contextualMessage);
+    }, [contextualMessage]);
 
     // Función de hablar (TTS)
     const speak = useCallback((text: string) => {
@@ -105,13 +106,14 @@ export default function SaniBot({ message: initialMessage, initialOpen = true }:
                 if (!Array.isArray(apps) || apps.length === 0) return null;
 
                 const now = new Date();
-                const sorted = [...apps].sort((a: any, b: any) => {
+                interface AppointmentItem { fecha?: string; hora?: string; doctor?: string }
+                const sorted = [...apps].sort((a: AppointmentItem, b: AppointmentItem) => {
                     const dateA = `${a.fecha || ""}T${a.hora || "00:00"}`;
                     const dateB = `${b.fecha || ""}T${b.hora || "00:00"}`;
                     return dateA.localeCompare(dateB);
                 });
 
-                const next = sorted.find((a: any) => {
+                const next = sorted.find((a: AppointmentItem) => {
                     if (!a?.fecha) return false;
                     const d = new Date(`${a.fecha}T${a.hora || "00:00"}`);
                     return d.getTime() >= now.getTime();
@@ -197,20 +199,20 @@ export default function SaniBot({ message: initialMessage, initialOpen = true }:
     // Global listeners para que el drag no se rompa si el mouse sale del div
     useEffect(() => {
         if (isDragging) {
-            window.addEventListener("pointermove", handlePointerMove as any);
+            window.addEventListener("pointermove", handlePointerMove as EventListener);
             window.addEventListener("pointerup", handlePointerUp);
-            window.addEventListener("touchmove", handlePointerMove as any);
+            window.addEventListener("touchmove", handlePointerMove as EventListener);
             window.addEventListener("touchend", handlePointerUp);
         } else {
-            window.removeEventListener("pointermove", handlePointerMove as any);
+            window.removeEventListener("pointermove", handlePointerMove as EventListener);
             window.removeEventListener("pointerup", handlePointerUp);
-            window.removeEventListener("touchmove", handlePointerMove as any);
+            window.removeEventListener("touchmove", handlePointerMove as EventListener);
             window.removeEventListener("touchend", handlePointerUp);
         }
         return () => {
-            window.removeEventListener("pointermove", handlePointerMove as any);
+            window.removeEventListener("pointermove", handlePointerMove as EventListener);
             window.removeEventListener("pointerup", handlePointerUp);
-            window.removeEventListener("touchmove", handlePointerMove as any);
+            window.removeEventListener("touchmove", handlePointerMove as EventListener);
             window.removeEventListener("touchend", handlePointerUp);
         }
     }, [isDragging, handlePointerMove, handlePointerUp]);

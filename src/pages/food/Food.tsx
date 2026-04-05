@@ -76,7 +76,8 @@ Recuerda comer despacio y disfrutar tu comida. Si eres diabético, espera 15 min
 
     try {
       // Remove id from form if it exists
-      const { id, ...rest } = form;
+      const { id: _unusedId, ...rest } = form;
+      void _unusedId;
       await saveMeal(rest);
 
       // Reset form

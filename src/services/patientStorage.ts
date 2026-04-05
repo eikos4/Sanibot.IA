@@ -80,26 +80,68 @@ export const getPatientData = async (): Promise<Partial<PatientData> | null> => 
   const user = auth.currentUser;
   if (!user) return localData;
 
+  return getPatientDataByUid(user.uid, localData);
+};
+
+export const getPatientDataByUid = async (
+  uid: string,
+  localData?: Partial<PatientData> | null
+): Promise<Partial<PatientData> | null> => {
+  const localFallback = typeof localData !== "undefined" ? localData : (() => {
+    try {
+      const local = localStorage.getItem(LOCAL_KEY);
+      return local ? JSON.parse(local) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!uid) return localFallback;
+
   try {
-    const userRef = doc(db, "users", user.uid);
+    const userRef = doc(db, "users", uid);
     const snapshot = await getDoc(userRef);
     if (snapshot.exists()) {
       const cloudData = snapshot.data() as PatientData;
+
+      const looksLikeOnboardingDone =
+        !!cloudData?.rut ||
+        !!cloudData?.fechaNacimiento ||
+        !!cloudData?.tipoDiabetes ||
+        !!cloudData?.prevision ||
+        !!cloudData?.peso ||
+        !!cloudData?.altura ||
+        !!cloudData?.emergenciaTelefono;
+
+      const inferredCompleted = looksLikeOnboardingDone ? true : undefined;
+
       // Merge with local cache so we don't lose flags (e.g. profileCompleted) when cloud is stale.
-      const merged = {
-        ...(localData || {}),
+      const merged: Partial<PatientData> = {
+        ...(localFallback || {}),
         ...(cloudData || {}),
         profileCompleted:
-          (cloudData as any)?.profileCompleted === true || (localData as any)?.profileCompleted === true ? true : undefined,
+          cloudData?.profileCompleted === true || localFallback?.profileCompleted === true
+            ? true
+            : inferredCompleted,
       };
       localStorage.setItem(LOCAL_KEY, JSON.stringify(merged));
+
+      // Best-effort: if profile looks completed but flag is missing, persist it.
+      if (inferredCompleted === true && cloudData?.profileCompleted !== true) {
+        try {
+          await setDoc(userRef, { profileCompleted: true }, { merge: true });
+        } catch (e) {
+          console.warn("Could not persist inferred profileCompleted to Firestore:", e);
+        }
+      }
+
       return merged;
     }
   } catch (error) {
     console.error("Error getting patient data from cloud, using local:", error);
   }
 
-  return localData;
+  return localFallback;
 };
 
 export const clearPatientData = () => {

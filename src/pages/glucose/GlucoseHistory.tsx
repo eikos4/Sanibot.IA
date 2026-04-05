@@ -70,7 +70,7 @@ export default function GlucoseHistory() {
         const data = await getGlucoseHistory();
         if (!mounted) return;
         setRecords(Array.isArray(data) ? data : []);
-      } catch (e) {
+      } catch {
         if (!mounted) return;
         setError("No se pudo cargar el historial.");
         setRecords([]);

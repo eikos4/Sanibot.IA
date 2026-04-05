@@ -6,12 +6,14 @@ import { getAppointments } from "../services/appointmentStorage";
 // @ts-ignore
 import { getMedicines } from "../services/medicineStorage";
 import { deleteAccount } from "../services/authService";
+import { useAuth } from "../context/AuthContext";
 import BMICalculator from "../components/BMICalculator";
 
 import type { PatientData } from "../services/patientStorage";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
 
@@ -20,11 +22,16 @@ export default function Profile() {
       const success = await deleteAccount();
       if (success) {
         alert("Cuenta eliminada correctamente.");
-        navigate("/onboarding"); // Or login
+        navigate("/login");
       } else {
         alert("Hubo un error al eliminar la cuenta. Por favor intenta de nuevo o contacta soporte.");
       }
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
   const [medicines, setMedicines] = useState<any[]>([]);
 
@@ -132,6 +139,13 @@ export default function Profile() {
         </div>
 
         <div className="profile-actions">
+          <button
+            style={logoutBtn}
+            onClick={handleLogout}
+          >
+            🚪 Cerrar Sesión
+          </button>
+
           <button
             style={btn}
             onClick={() => alert("Función de editar en construcción")}
@@ -270,6 +284,19 @@ const btn: React.CSSProperties = {
   fontSize: "18px",
   fontWeight: "bold",
   cursor: "pointer",
+};
+
+const logoutBtn: React.CSSProperties = {
+  width: "100%",
+  padding: "15px",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
+  color: "white",
+  border: "none",
+  fontSize: "18px",
+  fontWeight: "bold",
+  cursor: "pointer",
+  boxShadow: "0 4px 12px rgba(234, 88, 12, 0.3)",
 };
 
 const tag: React.CSSProperties = {

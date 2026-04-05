@@ -17,7 +17,7 @@ export interface GlucoseRecord {
     fecha: string;
     hora: string;
     comida: string;
-    timestamp?: any;
+    timestamp?: number | { seconds: number; nanoseconds: number } | null;
     userId?: string;
 }
 
