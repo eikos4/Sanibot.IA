@@ -16,7 +16,7 @@ export default function AdminPatients() {
           <div
             key={i}
             style={item}
-            onClick={() => navigate("/admin/patient/1")}
+            onClick={() => navigate(`/admin/patient/${i + 1}`)}
           >
             <p><strong>{p.name}</strong></p>
             <p style={{ color: "#666" }}>Diabetes: {p.diabetes}</p>

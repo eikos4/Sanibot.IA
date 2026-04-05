@@ -144,8 +144,14 @@ export const getGlucoseHistory = async (): Promise<GlucoseRecord[]> => {
 
     try {
         const firestoreData = await withTimeout(firestoreGet(), TIMEOUT_MS, []);
-        // Merge Firestore and local data (avoiding duplicates by checking dates)
-        const allData = [...firestoreData, ...localData];
+        // Merge Firestore and local data, deduplicating by fecha+hora+valor
+        const firestoreKeys = new Set(
+            firestoreData.map(r => `${r.fecha}-${r.hora}-${r.valor}`)
+        );
+        const uniqueLocal = localData.filter(
+            r => !firestoreKeys.has(`${r.fecha}-${r.hora}-${r.valor}`)
+        );
+        const allData = [...firestoreData, ...uniqueLocal];
         return allData;
     } catch (error) {
         console.error("Get history error, using localStorage:", error);
@@ -156,7 +162,17 @@ export const getGlucoseHistory = async (): Promise<GlucoseRecord[]> => {
 export const getLastGlucose = async (): Promise<GlucoseRecord | null> => {
     const history = await getGlucoseHistory();
     if (history.length > 0) {
-        return history[history.length - 1];
+        // Sort by timestamp to ensure we get the actual last reading
+        const sorted = [...history].sort((a, b) => {
+            const tA = typeof a.timestamp === 'object' && a.timestamp !== null
+                ? (a.timestamp as { seconds: number }).seconds
+                : (typeof a.timestamp === 'number' ? a.timestamp : 0);
+            const tB = typeof b.timestamp === 'object' && b.timestamp !== null
+                ? (b.timestamp as { seconds: number }).seconds
+                : (typeof b.timestamp === 'number' ? b.timestamp : 0);
+            return tA - tB;
+        });
+        return sorted[sorted.length - 1];
     }
     return null;
 };

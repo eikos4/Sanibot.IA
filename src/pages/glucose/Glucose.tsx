@@ -211,11 +211,12 @@ export default function Glucose() {
         console.warn("saveGlucose returned false - possibly no user ID");
       }
 
-      // Refresh history
-      await loadHistory();
+      // Refresh history and get updated data for analysis
+      const updatedHistory = await getGlucoseHistory();
+      setHistory(updatedHistory);
 
-      // Analyze and get smart recommendation
-      const analysis = analyzeGlucose(val, history);
+      // Analyze and get smart recommendation (use fresh data, not stale state)
+      const analysis = analyzeGlucose(val, updatedHistory);
       setLastAnalysis(analysis);
       console.log("Analysis:", analysis);
 
