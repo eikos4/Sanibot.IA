@@ -10,6 +10,8 @@ import { getLastGlucose, getGlucoseHistory } from "../services/glucoseStorage";
 import { getNextAppointment } from "../services/appointmentStorage";
 import HealthTrendChart from "../components/HealthTrendChart";
 import HydrationWidget from "../components/HydrationWidget";
+import LinkRequestsWidget from "../components/LinkRequestsWidget";
+import SaniBotScene from "../components/SaniBotScene";
 
 // Basic User Interface
 interface User {
@@ -546,320 +548,584 @@ function HomeMobile({ greeting, patient, navigate, lastGlucose, glucoseHistory, 
     speak(text);
   };
 
+  const getGlucoseStatus = (value: number) => {
+    if (value < 70) return { color: "#3B82F6", bg: "rgba(59,130,246,0.1)", label: "Baja", icon: "↓" };
+    if (value > 180) return { color: "#EF4444", bg: "rgba(239,68,68,0.1)", label: "Alta", icon: "↑" };
+    return { color: "#10B981", bg: "rgba(16,185,129,0.1)", label: "Normal", icon: "✓" };
+  };
+
+  const glucoseStatus = lastGlucose?.valor ? getGlucoseStatus(lastGlucose.valor) : null;
+
   return (
-    <div className="mobile-container">
-      {/* Hero Section */}
-      <div className="mobile-hero">
-        <button
-          type="button"
-          className="mobile-robot-button"
-          onClick={handleRobotPress}
-          aria-label="Abrir recomendaciones de SaniBot"
-        >
-          <img
-            src="/robot.png"
-            alt="GlucoBot"
-            className={`mobile-robot ${botSpeaking ? "mobile-robot-talking" : ""}`}
-          />
-        </button>
+    <div className="m-container">
+      {/* Animated Background */}
+      <div className="m-bg-gradient" />
+      <div className="m-bg-orbs">
+        <div className="m-orb m-orb-1" />
+        <div className="m-orb m-orb-2" />
+        <div className="m-orb m-orb-3" />
+      </div>
+
+      {/* Hero Section with SaniBot Scene */}
+      <div className="m-hero fade-in">
+        <SaniBotScene 
+          onPress={handleRobotPress} 
+          isSpeaking={botSpeaking}
+          userName={patient?.nombre || "Usuario"}
+        />
 
         {botOpen && botMessage && (
-          <div className="mobile-robot-bubble" onClick={() => setBotOpen(false)}>
-            {botMessage}
-            <div className="mobile-robot-bubble-arrow" />
+          <div className="m-bubble slide-up" onClick={() => setBotOpen(false)}>
+            <div className="m-bubble-content">{botMessage}</div>
+            <div className="m-bubble-close">✕</div>
           </div>
         )}
 
-        <h1 className="mobile-greeting">
-          {greeting}
-          <br />
-          <span className="mobile-name">{patient?.nombre || "usuario"}</span> 👋
-        </h1>
-        <p className="mobile-subtitle">¿Qué quieres hacer hoy?</p>
-
-        <div style={{ padding: "0 16px", marginTop: "20px" }}>
-          <h3 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "10px" }}>Resumen</h3>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div style={{ flex: 1, background: "#fff", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontSize: "12px", color: "#666" }}>Última Glicemia</div>
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: (lastGlucose?.valor || 0) > 180 ? "#EF4444" : "#10B981" }}>
-                {lastGlucose ? `${lastGlucose.valor} mg/dL` : "Sin datos"}
-              </div>
-            </div>
-            {/* WIDGET MOBILE PROX CITA */}
-            <div style={{ flex: 1, background: "#fff", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontSize: "12px", color: "#666" }}>Próxima Cita</div>
-              <div style={{ fontSize: "15px", fontWeight: "bold", color: "#6366F1" }}>
-                {(() => {
-                  if (!nextAppointment) return "Sin citas";
-                  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-                  const d = new Date(nextAppointment.fecha);
-                  return `${dias[d.getDay()]} ${d.getDate()} - ${nextAppointment.hora}`;
-                })()}
-              </div>
-            </div>
-          </div>
+        <div className="m-greeting slide-up">
+          <span className="m-greeting-text">{greeting}</span>
+          <h1 className="m-name">{patient?.nombre || "Usuario"}</h1>
+          <p className="m-subtitle">Tu asistente de salud personal</p>
         </div>
       </div>
 
-      {/* SOS BUTTON */}
-      <div style={{ marginTop: "25px", padding: "0 16px" }}>
-        <button
-          onClick={() => window.open("tel:131")}
-          style={{
-            width: "100%",
-            background: "#EF4444",
-            color: "white",
-            padding: "15px",
-            borderRadius: "16px",
-            border: "none",
-            fontWeight: "bold",
-            fontSize: "16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)"
-          }}
-        >
-          🆘 LLAMADA DE EMERGENCIA
+      {/* Stats Cards */}
+      <div className="m-stats slide-up-delay-1">
+        <div className="m-stat-card m-stat-glucose" onClick={() => navigate("/glucose")}>
+          <div className="m-stat-icon" style={{ background: glucoseStatus?.bg || "rgba(107,114,128,0.1)" }}>
+            <span style={{ color: glucoseStatus?.color || "#6B7280" }}>🩸</span>
+          </div>
+          <div className="m-stat-info">
+            <span className="m-stat-label">Glucosa</span>
+            <div className="m-stat-value" style={{ color: glucoseStatus?.color || "#6B7280" }}>
+              {lastGlucose?.valor ? (
+                <><span className="m-stat-number">{lastGlucose.valor}</span> <span className="m-stat-unit">mg/dL</span></>
+              ) : "Sin datos"}
+            </div>
+            {glucoseStatus && <span className="m-stat-badge" style={{ background: glucoseStatus.bg, color: glucoseStatus.color }}>{glucoseStatus.icon} {glucoseStatus.label}</span>}
+          </div>
+          <div className="m-stat-arrow">→</div>
+        </div>
+
+        <div className="m-stat-card m-stat-appointment" onClick={() => navigate("/appointments")}>
+          <div className="m-stat-icon" style={{ background: "rgba(99,102,241,0.1)" }}>
+            <span style={{ color: "#6366F1" }}>📅</span>
+          </div>
+          <div className="m-stat-info">
+            <span className="m-stat-label">Próxima Cita</span>
+            <div className="m-stat-value" style={{ color: "#6366F1" }}>
+              {nextAppointment ? (
+                <span className="m-stat-date">{new Date(nextAppointment.fecha).toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" })}</span>
+              ) : "Sin citas"}
+            </div>
+            {nextAppointment?.hora && <span className="m-stat-badge" style={{ background: "rgba(99,102,241,0.1)", color: "#6366F1" }}>🕐 {nextAppointment.hora}</span>}
+          </div>
+          <div className="m-stat-arrow">→</div>
+        </div>
+      </div>
+
+      {/* Link Requests */}
+      <div className="m-section slide-up-delay-2">
+        <LinkRequestsWidget />
+      </div>
+
+      {/* SOS Button */}
+      <div className="m-section slide-up-delay-2">
+        <button className="m-sos-btn" onClick={() => window.open("tel:131")}>
+          <span className="m-sos-icon">🆘</span>
+          <span className="m-sos-text">Emergencia</span>
+          <span className="m-sos-pulse" />
         </button>
       </div>
 
-      {/* Quick Actions */}
-      <div className="mobile-cards">
-        <div style={{ gridColumn: "1 / -1", display: "grid", gap: "15px" }}>
-          <HealthTrendChart
-            title="Tendencia Glucosa"
-            data={glucoseHistory || []}
-            type="glucose"
-            color="#10B981"
-          />
-          {/* Gráfico de Presión - Leemos directamente del localStorage por ahora ya que no tenemos helper exportado */}
-          <HealthTrendChart
-            title="Tendencia Presión Arterial"
-            data={JSON.parse(localStorage.getItem("pressureHistory") || "[]")}
-            type="pressure"
-            color="#F59E0B" // Naranja para sistólica
-          />
+      {/* Charts Section */}
+      <div className="m-section slide-up-delay-3">
+        <h2 className="m-section-title">📊 Tendencias</h2>
+        <div className="m-charts">
+          <HealthTrendChart title="Glucosa" data={glucoseHistory || []} type="glucose" color="#10B981" />
+          <HealthTrendChart title="Presión" data={JSON.parse(localStorage.getItem("pressureHistory") || "[]")} type="pressure" color="#F59E0B" />
         </div>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <HydrationWidget />
-        </div>
-        {mobileCard("💊", "Medicamentos", "/medicines", "#EEF2FF", navigate)}
-        {mobileCard("🩸", "Glicemia", "/glucose", "#FEF2F2", navigate)}
-        {mobileCard("💉", "Control de Insulina", "/insulin", "#EEE", navigate)}
-        {mobileCard("❤️", "Presión Arterial", "/pressure", "#FFF1F2", navigate)}
-        {mobileCard("⚖️", "Control de Peso", "/weight", "#F3E8FF", navigate)}
-        {mobileCard("🍽", "Alimentación", "/food", "#F0FDF4", navigate)}
-        {mobileCard("🚭", "Dejar de Fumar", "/quit-smoking", "#ECFDF5", navigate)}
-        {mobileCard("📅", "Citas", "/appointments", "#FFF7ED", navigate)}
-        {mobileCard("🤖", "GlucoBot", "/robot", "#F5F3FF", navigate)}
-        {mobileCard("👤", "Mi Perfil", "/profile", "#ECFEFF", navigate)}
+        <HydrationWidget />
       </div>
 
-      {/* ESTILOS MOBILE */}
+      {/* Quick Actions Grid */}
+      <div className="m-section">
+        <h2 className="m-section-title">⚡ Acciones Rápidas</h2>
+        <div className="m-grid">
+          {[
+            { icon: "💊", title: "Medicamentos", path: "/medicines", color: "#6366F1", bg: "#EEF2FF" },
+            { icon: "🩸", title: "Glicemia", path: "/glucose", color: "#EF4444", bg: "#FEF2F2" },
+            { icon: "💉", title: "Insulina", path: "/insulin", color: "#8B5CF6", bg: "#F5F3FF" },
+            { icon: "❤️", title: "Presión", path: "/pressure", color: "#EC4899", bg: "#FDF2F8" },
+            { icon: "⚖️", title: "Peso", path: "/weight", color: "#7C3AED", bg: "#F3E8FF" },
+            { icon: "🍽️", title: "Alimentación", path: "/food", color: "#10B981", bg: "#ECFDF5" },
+            { icon: "🚭", title: "Dejar Fumar", path: "/quit-smoking", color: "#059669", bg: "#D1FAE5" },
+            { icon: "📅", title: "Citas", path: "/appointments", color: "#F59E0B", bg: "#FEF3C7" },
+            { icon: "🤖", title: "GlucoBot", path: "/robot", color: "#6366F1", bg: "#E0E7FF" },
+            { icon: "👤", title: "Perfil", path: "/profile", color: "#0EA5E9", bg: "#E0F2FE" },
+          ].map((item, i) => (
+            <div key={item.path} className={`m-card slide-up-delay-${Math.min(i % 4 + 3, 6)}`} onClick={() => navigate(item.path)} style={{ "--card-color": item.color, "--card-bg": item.bg } as React.CSSProperties}>
+              <div className="m-card-icon">{item.icon}</div>
+              <span className="m-card-title">{item.title}</span>
+              <div className="m-card-shine" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="m-footer">
+        <p>Powered by <strong>Leucode.IA</strong></p>
+      </footer>
+
       <style>{`
-        .mobile-container {
+        .m-container {
           min-height: 100vh;
-          background: linear-gradient(180deg, #F0F4FF 0%, #FFFFFF 100%);
-          padding: 0;
+          position: relative;
+          overflow-x: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
-        .mobile-hero {
+        /* Animated Background */
+        .m-bg-gradient {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 100vh;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+          opacity: 0.03;
+          z-index: -2;
+        }
+
+        .m-bg-orbs {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: -1;
+          overflow: hidden;
+          pointer-events: none;
+        }
+
+        .m-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(60px);
+          opacity: 0.4;
+          animation: orbFloat 20s ease-in-out infinite;
+        }
+
+        .m-orb-1 {
+          width: 300px;
+          height: 300px;
+          background: linear-gradient(135deg, #6366F1, #8B5CF6);
+          top: -100px;
+          right: -100px;
+          animation-delay: 0s;
+        }
+
+        .m-orb-2 {
+          width: 200px;
+          height: 200px;
+          background: linear-gradient(135deg, #10B981, #34D399);
+          bottom: 20%;
+          left: -50px;
+          animation-delay: -7s;
+        }
+
+        .m-orb-3 {
+          width: 150px;
+          height: 150px;
+          background: linear-gradient(135deg, #F59E0B, #FBBF24);
+          bottom: -50px;
+          right: 20%;
+          animation-delay: -14s;
+        }
+
+        @keyframes orbFloat {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          25% { transform: translate(30px, -30px) scale(1.1); }
+          50% { transform: translate(-20px, 20px) scale(0.9); }
+          75% { transform: translate(20px, 30px) scale(1.05); }
+        }
+
+        /* Hero */
+        .m-hero {
+          padding: 40px 20px 30px;
           text-align: center;
-          padding: 40px 20px 32px;
-          background: white;
-          border-radius: 0 0 32px 32px;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-          margin-bottom: 24px;
-        }
-
-        .mobile-robot {
-          width: 140px;
-          height: auto;
+          background: rgba(255,255,255,0.8);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-radius: 0 0 40px 40px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.08);
           margin-bottom: 20px;
-          animation: float 3s ease-in-out infinite;
         }
 
-        .mobile-robot-button {
-          background: transparent;
+        .m-robot-btn {
+          position: relative;
+          background: none;
           border: none;
-          padding: 0;
           cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          touch-action: manipulation;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
+          padding: 0;
+          margin-bottom: 15px;
         }
 
-        .mobile-robot-button:active .mobile-robot {
-          transform: scale(0.97);
+        .m-robot {
+          width: 120px;
+          height: auto;
+          position: relative;
+          z-index: 2;
+          animation: robotFloat 4s ease-in-out infinite;
+          filter: drop-shadow(0 10px 20px rgba(99,102,241,0.3));
         }
 
-        .mobile-robot-talking {
-          animation: talk 0.35s ease-in-out infinite alternate;
+        .m-robot-talk {
+          animation: robotTalk 0.3s ease-in-out infinite alternate;
         }
 
-        .mobile-robot-bubble {
-          background: rgba(232, 240, 255, 0.98);
-          color: #0F172A;
-          padding: 12px 14px;
-          border-radius: 16px 16px 6px 16px;
-          border: 1px solid rgba(99, 102, 241, 0.25);
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.10);
+        .m-robot-glow {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 140px;
+          height: 140px;
+          background: radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%);
+          border-radius: 50%;
+          z-index: 1;
+        }
+
+        .m-robot-pulse {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 100px;
+          height: 100px;
+          border: 2px solid rgba(99,102,241,0.3);
+          border-radius: 50%;
+          animation: pulse 2s ease-out infinite;
+          z-index: 0;
+        }
+
+        @keyframes robotFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+
+        @keyframes robotTalk {
+          from { transform: translateY(0) scale(1); }
+          to { transform: translateY(-5px) scale(1.02); }
+        }
+
+        @keyframes pulse {
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+
+        .m-bubble {
+          background: rgba(255,255,255,0.95);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          padding: 16px 20px;
+          margin: 0 auto 20px;
           max-width: 320px;
-          margin: 0 auto 14px;
-          font-size: 14px;
-          line-height: 1.35;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+          border: 1px solid rgba(99,102,241,0.2);
           position: relative;
           cursor: pointer;
         }
 
-        .mobile-robot-bubble-arrow {
-          position: absolute;
-          top: -6px;
-          left: 50%;
-          transform: translateX(-50%) rotate(45deg);
-          width: 12px;
-          height: 12px;
-          background: rgba(232, 240, 255, 0.98);
-          border-top: 1px solid rgba(99, 102, 241, 0.25);
-          border-left: 1px solid rgba(99, 102, 241, 0.25);
-        }
-
-        .mobile-voice {
-          display: grid;
-          gap: 6px;
-          max-width: 320px;
-          margin: 0 auto 14px;
-          text-align: left;
-        }
-
-        .mobile-voice-label {
-          font-size: 12px;
-          color: #64748B;
-          font-weight: 600;
-        }
-
-        .mobile-voice-select {
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 12px;
-          border: 1px solid rgba(15, 23, 42, 0.10);
-          background: rgba(255, 255, 255, 0.9);
-          color: #0F172A;
+        .m-bubble-content {
           font-size: 14px;
-          outline: none;
+          line-height: 1.5;
+          color: #1F2937;
         }
 
-        .mobile-greeting {
-          font-size: 24px;
-          font-weight: 700;
-          color: #0F172A;
-          margin: 0 0 8px 0;
-          line-height: 1.3;
+        .m-bubble-close {
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          font-size: 12px;
+          color: #9CA3AF;
         }
 
-        .mobile-name {
-          background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+        .m-greeting-text {
+          font-size: 16px;
+          color: #6B7280;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .m-name {
+          font-size: 32px;
+          font-weight: 800;
+          background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          margin: 0 0 8px;
+          letter-spacing: -0.5px;
         }
 
-        .mobile-subtitle {
-          color: #64748B;
-          font-size: 16px;
+        .m-subtitle {
+          font-size: 14px;
+          color: #9CA3AF;
           margin: 0;
         }
 
-        .mobile-cards {
-          padding: 0 16px 24px;
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
-        }
-
-        .mobile-card {
-          background: white;
-          border-radius: 20px;
-          padding: 24px;
-          text-align: center;
-          cursor: pointer;
-          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-          transition: all 0.3s ease;
-          border: 1px solid rgba(0, 0, 0, 0.04);
-          min-height: 140px;
+        /* Stats */
+        .m-stats {
+          padding: 0 16px;
           display: flex;
           flex-direction: column;
-          align-items: center;
-          justify-content: center;
           gap: 12px;
+          margin-bottom: 20px;
         }
 
-        .mobile-card:active {
-          transform: scale(0.95);
-          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+        .m-stat-card {
+          background: rgba(255,255,255,0.9);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          padding: 16px 20px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          border: 1px solid rgba(255,255,255,0.8);
+          cursor: pointer;
+          transition: all 0.3s ease;
         }
 
-        .mobile-card-icon {
-          width: 56px;
-          height: 56px;
+        .m-stat-card:active {
+          transform: scale(0.98);
+        }
+
+        .m-stat-icon {
+          width: 50px;
+          height: 50px;
           border-radius: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 32px;
-          background: var(--card-bg);
-          margin-bottom: 4px;
+          font-size: 24px;
         }
 
-        .mobile-card-title {
-          font-size: 15px;
+        .m-stat-info {
+          flex: 1;
+        }
+
+        .m-stat-label {
+          font-size: 12px;
+          color: #6B7280;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .m-stat-value {
+          font-size: 20px;
+          font-weight: 700;
+          margin: 2px 0;
+        }
+
+        .m-stat-number {
+          font-size: 28px;
+        }
+
+        .m-stat-unit {
+          font-size: 14px;
+          font-weight: 500;
+          opacity: 0.7;
+        }
+
+        .m-stat-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11px;
           font-weight: 600;
-          color: #0F172A;
-          margin: 0;
-          line-height: 1.3;
+          padding: 4px 10px;
+          border-radius: 20px;
         }
 
-        /* Mejoras táctiles para Android */
-        @media (max-width: 767px) {
-          .mobile-card {
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-          }
+        .m-stat-arrow {
+          font-size: 18px;
+          color: #D1D5DB;
         }
 
-        /* Pantallas muy pequeñas */
+        /* SOS Button */
+        .m-sos-btn {
+          width: 100%;
+          background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+          color: white;
+          border: none;
+          border-radius: 16px;
+          padding: 16px;
+          font-size: 16px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 8px 30px rgba(239,68,68,0.4);
+          transition: all 0.3s ease;
+        }
+
+        .m-sos-btn:active {
+          transform: scale(0.98);
+        }
+
+        .m-sos-icon {
+          font-size: 20px;
+        }
+
+        .m-sos-pulse {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 100%;
+          height: 100%;
+          background: rgba(255,255,255,0.3);
+          border-radius: 16px;
+          animation: sosPulse 2s ease-out infinite;
+        }
+
+        @keyframes sosPulse {
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+          100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
+        /* Sections */
+        .m-section {
+          padding: 0 16px;
+          margin-bottom: 24px;
+        }
+
+        .m-section-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1F2937;
+          margin: 0 0 16px;
+        }
+
+        .m-charts {
+          display: grid;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        /* Cards Grid */
+        .m-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 14px;
+        }
+
+        .m-card {
+          background: rgba(255,255,255,0.9);
+          backdrop-filter: blur(10px);
+          border-radius: 24px;
+          padding: 24px 16px;
+          text-align: center;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          border: 1px solid rgba(255,255,255,0.8);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .m-card:active {
+          transform: scale(0.95);
+        }
+
+        .m-card-icon {
+          width: 56px;
+          height: 56px;
+          margin: 0 auto 12px;
+          background: var(--card-bg);
+          border-radius: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 28px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .m-card-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+        }
+
+        .m-card-shine {
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.4) 50%, transparent 60%);
+          transform: translateX(-100%);
+          transition: transform 0.6s ease;
+        }
+
+        .m-card:hover .m-card-shine {
+          transform: translateX(100%);
+        }
+
+        /* Footer */
+        .m-footer {
+          text-align: center;
+          padding: 30px 20px 40px;
+          color: #9CA3AF;
+          font-size: 12px;
+        }
+
+        .m-footer strong {
+          background: linear-gradient(135deg, #6366F1, #8B5CF6);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        /* Animations */
+        .fade-in {
+          animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        .slide-up {
+          animation: slideUp 0.6s ease-out forwards;
+        }
+
+        .slide-up-delay-1 { animation: slideUp 0.6s ease-out 0.1s forwards; opacity: 0; }
+        .slide-up-delay-2 { animation: slideUp 0.6s ease-out 0.2s forwards; opacity: 0; }
+        .slide-up-delay-3 { animation: slideUp 0.6s ease-out 0.3s forwards; opacity: 0; }
+        .slide-up-delay-4 { animation: slideUp 0.6s ease-out 0.4s forwards; opacity: 0; }
+        .slide-up-delay-5 { animation: slideUp 0.6s ease-out 0.5s forwards; opacity: 0; }
+        .slide-up-delay-6 { animation: slideUp 0.6s ease-out 0.6s forwards; opacity: 0; }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
         @media (max-width: 360px) {
-          .mobile-cards {
-            gap: 12px;
-          }
-
-          .mobile-card {
-            padding: 20px 16px;
-            min-height: 120px;
-          }
-
-          .mobile-card-icon {
-            width: 48px;
-            height: 48px;
-            font-size: 28px;
-          }
-
-          .mobile-card-title {
-            font-size: 14px;
-          }
-        }
-
-        @keyframes talk {
-          from { transform: translateY(0); }
-          to { transform: translateY(-6px); }
+          .m-name { font-size: 26px; }
+          .m-card { padding: 20px 12px; }
+          .m-card-icon { width: 48px; height: 48px; font-size: 24px; }
         }
       `}</style>
-    </div >
+    </div>
   );
 }
 

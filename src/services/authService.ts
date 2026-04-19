@@ -419,3 +419,73 @@ export const getCachedUser = (): User | null => {
         return null;
     }
 };
+
+// ============ ADMIN UTILITIES ============
+
+/**
+ * Promote current user to admin (for initial setup)
+ * Call this from browser console: await promoteToAdmin()
+ */
+export const promoteToAdmin = async (): Promise<boolean> => {
+    try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            console.error("❌ No hay usuario logueado. Inicia sesión primero.");
+            return false;
+        }
+
+        const userRef = doc(db, "users", currentUser.uid);
+        await setDoc(userRef, { role: "admin" }, { merge: true });
+
+        // Update local cache
+        const cached = getCachedUser();
+        if (cached) {
+            cached.role = "admin";
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cached));
+        }
+
+        console.log("✅ Usuario promovido a ADMIN exitosamente!");
+        console.log("📧 Email:", currentUser.email);
+        console.log("🔑 UID:", currentUser.uid);
+        console.log("🔄 Recarga la página para ver los cambios.");
+        
+        return true;
+    } catch (error) {
+        console.error("❌ Error al promover a admin:", error);
+        return false;
+    }
+};
+
+/**
+ * Promote any user to admin by email
+ */
+export const promoteUserToAdmin = async (email: string): Promise<boolean> => {
+    try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email.toLowerCase()), limit(1));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            console.error("❌ No se encontró usuario con email:", email);
+            return false;
+        }
+
+        const userDoc = snapshot.docs[0];
+        await setDoc(doc(db, "users", userDoc.id), { role: "admin" }, { merge: true });
+
+        console.log("✅ Usuario promovido a ADMIN!");
+        console.log("📧 Email:", email);
+        console.log("🔑 UID:", userDoc.id);
+        
+        return true;
+    } catch (error) {
+        console.error("❌ Error:", error);
+        return false;
+    }
+};
+
+// Expose to window for console access
+if (typeof window !== "undefined") {
+    (window as unknown as Record<string, unknown>).promoteToAdmin = promoteToAdmin;
+    (window as unknown as Record<string, unknown>).promoteUserToAdmin = promoteUserToAdmin;
+}

@@ -103,6 +103,58 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // CARETAKER-PATIENT LINKS
+    // Caretakers can create links, patients can accept/reject
+    match /caretaker_links/{linkId} {
+      allow read: if isSignedIn() && (
+        resource.data.caretakerId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && request.resource.data.caretakerId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.caretakerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.caretakerId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ALERTS
+    // Caretakers can read their alerts, system creates them
+    match /alerts/{alertId} {
+      allow read: if isSignedIn() && (
+        resource.data.caretakerId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.caretakerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // NOTIFICATIONS
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // SYSTEM LOGS (Admin only)
+    match /system_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

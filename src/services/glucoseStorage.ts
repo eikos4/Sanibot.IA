@@ -10,6 +10,7 @@ import {
     where,
     serverTimestamp
 } from "firebase/firestore";
+import { checkGlucoseAndAlert } from "./caretakerService";
 
 export interface GlucoseRecord {
     id?: string;
@@ -103,6 +104,14 @@ export const saveGlucose = async (record: Omit<GlucoseRecord, "timestamp" | "id"
         if (!result) {
             // Timeout occurred, save locally
             saveToLocalStorage(record as GlucoseRecord);
+        } else {
+            // Check glucose levels and alert caretakers if needed
+            try {
+                const userName = getUserName();
+                await checkGlucoseAndAlert(uid, userName, record.valor);
+            } catch (alertError) {
+                console.warn("Could not check glucose alerts:", alertError);
+            }
         }
         return true;
     } catch (error) {
@@ -110,6 +119,19 @@ export const saveGlucose = async (record: Omit<GlucoseRecord, "timestamp" | "id"
         saveToLocalStorage(record as GlucoseRecord);
         return true;
     }
+};
+
+const getUserName = (): string => {
+    try {
+        const user = localStorage.getItem("glucobot_current_user");
+        if (user) {
+            const parsed = JSON.parse(user);
+            return parsed.name || parsed.nombre || "Paciente";
+        }
+    } catch {
+        // ignore
+    }
+    return "Paciente";
 };
 
 export const getGlucoseHistory = async (): Promise<GlucoseRecord[]> => {
